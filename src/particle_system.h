@@ -5,6 +5,28 @@
 #include "mex.h"
 #endif
 
+#define NUM_DIMENSIONS 3
+/* TODO check and conform to matlab ordering scheme */
+#define POSITION_DIMS(x)     NUM_DIMENSIONS, x->pnum
+#define POSNEXT_DIMS(x)      NUM_DIMENSIONS, x->pnum
+#define VELOCITY_DIMS(x)     NUM_DIMENSIONS, x->pnum
+#define VELEVAL_DIMS(x)      NUM_DIMENSIONS, x->pnum
+#define VELNEXT_DIMS(x)      NUM_DIMENSIONS, x->pnum
+#define ACCELERATION_DIMS(x) NUM_DIMENSIONS, x->pnum
+#define FORCE_DIMS(x)        NUM_DIMENSIONS, x->pnum
+#define DENSITY_DIMS(x)      x->pnum
+#define VOLUME_DIMS(x)       x->pnum
+
+#define POSITION_SIZE(x)     NUM_DIMENSIONS * x->pnum
+#define POSNEXT_SIZE(x)      NUM_DIMENSIONS * x->pnum
+#define VELOCITY_SIZE(x)     NUM_DIMENSIONS * x->pnum
+#define VELEVAL_SIZE(x)      NUM_DIMENSIONS * x->pnum
+#define VELNEXT_SIZE(x)      NUM_DIMENSIONS * x->pnum
+#define ACCELERATION_SIZE(x) NUM_DIMENSIONS * x->pnum
+#define FORCE_SIZE(x)        NUM_DIMENSIONS * x->pnum
+#define DENSITY_SIZE(x)      x->pnum
+#define VOLUME_SIZE(x)       x->pnum
+
 typedef struct
 {
     int pnum;
@@ -44,6 +66,5 @@ void free_psdata( psdata * data );
 
 void _increment_position_0_opencl( psdata * data );
 void _decrement_position_0_opencl( psdata * data );
-void do_opencl_whatever();
 
 #endif

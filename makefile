@@ -5,7 +5,7 @@ BUILD_FILES=$(shell find build -type f)
 
 native: bin/testopencl
 
-mex: bin/mex/testentry.mexa64 bin/mex/testentry2.mexa64 bin/mex/testopencl.mexa64
+mex: bin/mex/testentry.mexa64
 
 clean:
 ifneq ($(strip $(BIN_FILES)),)
@@ -18,13 +18,13 @@ endif
 bin/testopencl: build/testopencl.o bin/libsph.so
 	$(CC) -Wl,-rpath,'$$ORIGIN' -fPIC $< -o $@ -lsph -Lbin
 
-bin/libsph.so: build/particle_system.o build/opencl/particle_system_host.o
+bin/libsph.so: build/opencl/particle_system_host.o build/opencl/platforminfo.o build/note.o
 	$(CC) -shared -fPIC $^ -o $@ -lOpenCL
 
 build/%.o: src/%.c
 	$(CC) -fPIC -c $< -o $@
 
-bin/mex/libsph_mex.so: build/mex/particle_system_mex.o build/mex/opencl/particle_system_host_mex.o
+bin/mex/libsph_mex.so: build/mex/particle_system_mex.o build/mex/opencl/platforminfo_mex.o build/mex/note_mex.o
 	$(CC) -shared $^ -o $@ -lOpenCL
 
 bin/mex/%.mexa64: build/mex/%.o bin/mex/libsph_mex.so
