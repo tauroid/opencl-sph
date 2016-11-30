@@ -5,6 +5,8 @@ An implementation of smoothed particle hydrodynamics using OpenCL.
 
 This code is under development and may be subject to heavy revision at any time.
 
+The nearest-neighbour search (NNS) algorithm is derived from the method used for [Fluids v3. by Rama Hoetzlein](https://github.com/rchoetzlein/fluids3).
+
 Installation
 ------------
 
