@@ -15,21 +15,24 @@
 
 #define WG_FUJ_SZ 896
 
-static int ready = 0;
-static cl_context context = NULL;
-static cl_command_queue * command_queues;
-static unsigned int num_command_queues = 0;
+static int _ready = 0;
+static cl_context _context = NULL;
+static cl_command_queue * _command_queues;
+static unsigned int _num_command_queues = 0;
 
-static Platform const * platforms;
-static unsigned int num_platforms;
+static Platform const * _platforms;
+static unsigned int _num_platforms;
 
-static psdata_opencl pso;
+#ifdef MATLAB_MEX_FILE
+static psdata_opencl _pso;
+#endif
 
 char * add_field_macros_to_start_of_string(const char * string, psdata * data);
 
 #ifdef MATLAB_MEX_FILE
-psdata_opencl get_stored_psdata_opencl() {
-    return pso;
+psdata_opencl * get_stored_psdata_opencl()
+{
+    return &_pso;
 }
 #endif
 
@@ -38,47 +41,109 @@ psdata_opencl get_stored_psdata_opencl() {
  *
  * Detects hardware, creates command queues
  */
-void init_ps_opencl() {
-    if (ready) return;
+void init_opencl()
+{
+    if (_ready) return;
 
-    get_opencl_platform_info(&platforms, &num_platforms);
+    get_opencl_platform_info(&_platforms, &_num_platforms);
 
-    ASSERT(num_platforms > 0);
+    ASSERT(_num_platforms > 0);
 
     const cl_context_properties context_properties[] = {
-        CL_CONTEXT_PLATFORM, (cl_context_properties) platforms[0].id, 0
+        CL_CONTEXT_PLATFORM, (cl_context_properties) _platforms[0].id, 0
     };
     
     cl_int error;
 
-    context = clCreateContextFromType
+    _context = clCreateContextFromType
         ( (const cl_context_properties*) context_properties,
           CL_DEVICE_TYPE_GPU, contextErrorCallback, NULL, &error );
 
     HANDLE_CL_ERROR(error);
 
-    command_queues     = malloc(platforms[0].num_devices*sizeof(cl_command_queue));
-    num_command_queues = platforms[0].num_devices;
+    _command_queues     = malloc(_platforms[0].num_devices*sizeof(cl_command_queue));
+    _num_command_queues = _platforms[0].num_devices;
 
-    ASSERT(num_command_queues > 0);
+    ASSERT(_num_command_queues > 0);
 
-    const cl_queue_properties queue_properties[] = {
-        CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0
-    };
-
-    int i;
-    for (i = 0; i < num_command_queues; ++i) {
-        command_queues[i] = clCreateCommandQueue
-            ( context, platforms[0].devices[i].id,
+    unsigned int i;
+    for (i = 0; i < _num_command_queues; ++i) {
+        _command_queues[i] = clCreateCommandQueue
+            ( _context, _platforms[0].devices[i].id,
               CL_QUEUE_PROFILING_ENABLE, &error );
 
         HANDLE_CL_ERROR(error);
     }
 
-    ready = 1;
+    _ready = 1;
 }
 
-void build_program(psdata * data, psdata_opencl * bl) {
+static void create_kernels(psdata_opencl * pso)
+{
+    size_t kernel_names_size;
+    const char * kernel_names;
+
+    HANDLE_CL_ERROR(clGetProgramInfo(pso->ps_prog, CL_PROGRAM_NUM_KERNELS, sizeof(size_t), &pso->num_kernels, NULL));
+    HANDLE_CL_ERROR(clGetProgramInfo(pso->ps_prog, CL_PROGRAM_KERNEL_NAMES, 0, NULL, &kernel_names_size));
+
+    kernel_names = malloc(kernel_names_size);
+
+    HANDLE_CL_ERROR(clGetProgramInfo(pso->ps_prog, CL_PROGRAM_KERNEL_NAMES, kernel_names_size, (void*) kernel_names, NULL));
+
+    note(1, "%s\n", kernel_names);
+
+    pso->kernel_names = malloc(pso->num_kernels*sizeof(char*));
+    pso->kernels = malloc(pso->num_kernels*sizeof(cl_kernel));
+
+    char * kernel_names_ptr = (char*) kernel_names;
+
+    strtok(kernel_names_ptr, ";");
+
+    for (size_t i = 0; i < pso->num_kernels; ++i) {
+        char ** kernel_name_ptr = (char**) pso->kernel_names + i;
+
+        *kernel_name_ptr = malloc((strlen(kernel_names_ptr)+1)*sizeof(char));
+        strcpy(*kernel_name_ptr, kernel_names_ptr);
+
+        note(1, "%s, ", pso->kernel_names[i]);
+
+        cl_int error;
+
+        *((cl_kernel*) pso->kernels + i) = clCreateKernel(pso->ps_prog, pso->kernel_names[i], &error); HANDLE_CL_ERROR(error);
+
+        kernel_names_ptr = strtok(NULL, ";");
+    }
+
+    note(1, "\n");
+}
+
+cl_kernel get_kernel(psdata_opencl pso, const char * name)
+{
+    for (size_t i = 0; i < pso.num_kernels; ++i) {
+        if (strcmp(name, pso.kernel_names[i]) == 0) return pso.kernels[i];
+    }
+
+    return NULL;
+}
+
+void call_kernel_device_opencl(psdata_opencl pso, const char * kernel_name, cl_uint work_dim,
+                               const size_t * global_work_offset, const size_t * global_work_size,
+                               const size_t * local_work_size)
+{
+    cl_kernel kernel = get_kernel(pso, kernel_name);
+
+    ASSERT(kernel != NULL);
+
+    note(1, "Calling kernel %s with work size %u and local size %u\n", kernel_name, *global_work_size, *local_work_size);
+
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], kernel, work_dim, global_work_offset,
+                                           global_work_size, local_work_size, 0, NULL, NULL));
+
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
+}
+
+void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
+{
     cl_int error;
 
     /* Get file data */
@@ -103,65 +168,94 @@ void build_program(psdata * data, psdata_opencl * bl) {
         exe_path = getenv("EXE_PATH");
 #endif
 
+        const char * file_extension = ".cl";
 #ifndef MATLAB_MEX_FILE
-        const char * kern_rel_path = "/kernels/particle_system_kern.cl";
+        const char * kern_rel_path = "/../kernels/";
 #else
-        const char * kern_rel_path = "/../kernels/particle_system_kern.cl";
+        const char * kern_rel_path = "/../../kernels/";
 #endif
 
-        char * kern_path = malloc((strlen(exe_path)+strlen(kern_rel_path)+1)*sizeof(char));
+        char * file_list_copy = malloc((strlen(file_list)+1)*sizeof(char));
 
-        sprintf(kern_path, "%s%s", exe_path, kern_rel_path);
+        strcpy(file_list_copy, file_list);
+
+        char * file_name = strtok(file_list_copy, ", \n");
+
+        char * compilation_unit = calloc(1, sizeof(char));
+
+        while (file_name) {
+            char * file_path = malloc( ( strlen(exe_path)
+                                       + strlen(kern_rel_path)
+                                       + strlen(file_name)
+                                       + strlen(file_extension)
+                                       + 1
+                                       ) * sizeof(char));
+            
+            sprintf(file_path, "%s%s%s%s", exe_path, kern_rel_path, file_name, file_extension);
+
+            note(1, "Adding OpenCL file at %s\n", file_path);
+
+            long int file_length;
+
+            FILE * f = fopen(file_path, "rb");
+
+            free(file_path);
+
+            ASSERT(f != NULL);
+
+            fseek(f, 0, SEEK_END);
+            file_length = ftell(f);
+            fseek(f, 0, SEEK_SET);
+
+            size_t compilation_unit_len = strlen(compilation_unit);
+
+            size_t new_length = compilation_unit_len + file_length / sizeof(char);
+
+            char * compilation_unit_temp = malloc((new_length + 1) * sizeof(char));
+
+            strcpy(compilation_unit_temp, compilation_unit);
+            fread(compilation_unit_temp + compilation_unit_len, sizeof(char), file_length, f);
+
+            fclose(f);
+
+            compilation_unit_temp[new_length] = '\0';
+
+            free(compilation_unit);
+
+            compilation_unit = compilation_unit_temp;
+
+            file_name = strtok(NULL, ", \n");
+        }
+
+        free(file_list_copy);
 
 #ifndef MATLAB_MEX_FILE
         free(exe_path);
 #endif
 
-        note(1, "Compiling OpenCL program at %s\n", kern_path);
+        char * compilation_unit_with_macros = add_field_macros_to_start_of_string(compilation_unit, data);
+        free(compilation_unit);
 
-        long int kern_string_len;
-        char * kern_string;
+        size_t cu_macros_length = strlen(compilation_unit_with_macros);
 
-        FILE * f = fopen(kern_path, "r");
-
-        free(kern_path);
-
-        ASSERT(f != NULL);
-
-        fseek(f, 0, SEEK_END);
-        kern_string_len = ftell(f);
-        fseek(f, 0, SEEK_SET);
-
-        kern_string = malloc((kern_string_len+1)*sizeof(char));
-        fread(kern_string, sizeof(char), kern_string_len, f);
-
-        fclose(f);
-
-        kern_string[kern_string_len] = '\0';
-
-        char * kern_string_with_macros = add_field_macros_to_start_of_string(kern_string, data);
-        free(kern_string);
-
-        size_t ks_macros_length = strlen(kern_string_with_macros);
-
-        bl->ps_prog = clCreateProgramWithSource(context, 1, (const char **) &kern_string_with_macros, &ks_macros_length, &error);
+        pso->ps_prog = clCreateProgramWithSource(_context, 1, (const char **) &compilation_unit_with_macros, &cu_macros_length, &error);
         HANDLE_CL_ERROR(error);
 
-        free(kern_string_with_macros);
+        free(compilation_unit_with_macros);
     }
 
-    cl_int build_error = clBuildProgram(bl->ps_prog, 1, &platforms[0].devices[0].id, "-cl-fast-relaxed-math", NULL, NULL);
+    cl_int build_error = clBuildProgram(pso->ps_prog, 1, &_platforms[0].devices[0].id, "-cl-fast-relaxed-math", NULL, NULL);
 
     if (build_error != CL_SUCCESS) {
         char * error_log;
         size_t log_length;
 
-        HANDLE_CL_ERROR(clGetProgramBuildInfo(bl->ps_prog, platforms[0].devices[0].id,
+        HANDLE_CL_ERROR(clGetProgramBuildInfo(pso->ps_prog, _platforms[0].devices[0].id,
                                               CL_PROGRAM_BUILD_LOG, 0, NULL, &log_length));
 
         error_log = malloc(log_length*sizeof(char));
 
-        HANDLE_CL_ERROR(clGetProgramBuildInfo(bl->ps_prog, platforms[0].devices[0].id,
+        HANDLE_CL_ERROR(clGetProgramBuildInfo(pso->ps_prog, _platforms[0].devices[0].id,
                                               CL_PROGRAM_BUILD_LOG, log_length, error_log, NULL));
 
         printf("%s\n", error_log);
@@ -170,21 +264,11 @@ void build_program(psdata * data, psdata_opencl * bl) {
 
         HANDLE_CL_ERROR(build_error);
     }
-
-    bl->kern_cuboid = clCreateKernel(bl->ps_prog, "populate_position_cuboid", &error); HANDLE_CL_ERROR(error);
-    bl->kern_find_particle_bins = clCreateKernel(bl->ps_prog, "find_particle_bins", &error); HANDLE_CL_ERROR(error);
-    bl->kern_count_particles_in_bins = clCreateKernel(bl->ps_prog, "count_particles_in_bins", &error); HANDLE_CL_ERROR(error);
-    bl->kern_prefix_sum = clCreateKernel(bl->ps_prog, "prefix_sum", &error); HANDLE_CL_ERROR(error);
-    bl->kern_copy_celloffset_to_backup = clCreateKernel(bl->ps_prog, "copy_celloffset_to_backup", &error); HANDLE_CL_ERROR(error);
-    bl->kern_insert_particles_in_bin_array = clCreateKernel(bl->ps_prog, "insert_particles_in_bin_array", &error); HANDLE_CL_ERROR(error);
-
-    bl->kern_compute_density = clCreateKernel(bl->ps_prog, "compute_density", &error); HANDLE_CL_ERROR(error);
-    bl->kern_compute_forces = clCreateKernel(bl->ps_prog, "compute_forces", &error); HANDLE_CL_ERROR(error);
-    bl->kern_step_forward = clCreateKernel(bl->ps_prog, "step_forward", &error); HANDLE_CL_ERROR(error);
 }
 
 /* Allocates new string */
-char * add_field_macros_to_start_of_string(const char * string, psdata * data) {
+char * add_field_macros_to_start_of_string(const char * string, psdata * data)
+{
     const char * start = "#define ";
     const char * middle = " (((global char *) data) + data_offsets[";
     const char * end = "])\n";
@@ -195,7 +279,7 @@ char * add_field_macros_to_start_of_string(const char * string, psdata * data) {
 
     size_t string_size = 0;
 
-    int f = 0;
+    unsigned int f = 0;
     for (; f < data->num_fields; ++f) {
         string_size += start_size + strlen(data->names + data->names_offsets[f]) + 2 + middle_size + (int)(f == 0 ? 1 : floor(log10(f)) + 1) + end_size;
     }
@@ -218,149 +302,184 @@ char * add_field_macros_to_start_of_string(const char * string, psdata * data) {
     return newstring;
 }
 
-void bin_and_count_device_opencl(psdata * data) {
-    size_t max_workgroup_size = platforms[0].devices[0].max_workgroup_size;
+static void zero_gridcount_device_opencl(psdata_opencl pso)
+{
+    unsigned int * gridres;
 
-    unsigned int * pnum_ptr;
+    PS_GET_FIELD(pso.host_psdata, "gridres", unsigned int, &gridres);
 
-    PS_SET_PTR(data, "pnum", unsigned int, &pnum_ptr)
-    unsigned int pnum = *pnum_ptr;
+    size_t num_workgroups = gridres[0]*gridres[1]*gridres[2] / pso.po2_workgroup_size + 1;
+    size_t num_workitems = num_workgroups * pso.po2_workgroup_size;
 
-    size_t num_p_workgroups = pnum / max_workgroup_size + 1;
-    size_t num_p_workitems = num_p_workgroups * max_workgroup_size;
-
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_find_particle_bins, 1,
-                                           NULL, &num_p_workitems, &max_workgroup_size, 0, NULL, NULL));
-
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
-
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_count_particles_in_bins, 1,
-                                           NULL, &num_p_workitems, &max_workgroup_size, 0, NULL, NULL));
-
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    call_kernel_device_opencl(pso, "zero_gridcount", 1, 0, &num_workitems, &pso.po2_workgroup_size);
 }
 
-void prefix_sum_device_opencl(psdata * data) {
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_prefix_sum, NUM_PS_ARGS, 2*pso.po2_workgroup_size*sizeof(unsigned int), NULL));
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_prefix_sum, NUM_PS_ARGS + 1, sizeof(unsigned int), &pso.num_grid_cells));
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_prefix_sum, NUM_PS_ARGS + 2, sizeof(cl_mem), &pso.block_totals));
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_prefix_sum, NUM_PS_ARGS + 3, sizeof(unsigned int), &pso.num_blocks));
+static void bin_and_count_device_opencl(psdata_opencl pso)
+{
+    unsigned int * pnum_ptr;
+
+    PS_GET_FIELD(pso.host_psdata, "pnum", unsigned int, &pnum_ptr)
+    unsigned int pnum = *pnum_ptr;
+
+    size_t num_p_workgroups = pnum / pso.po2_workgroup_size + 1;
+    size_t num_p_workitems = num_p_workgroups * pso.po2_workgroup_size;
+
+    cl_kernel find_particle_bins = get_kernel(pso, "find_particle_bins");
+    cl_kernel count_particles_in_bins = get_kernel(pso, "count_particles_in_bins");
+
+    ASSERT(find_particle_bins != NULL && count_particles_in_bins != NULL);
+
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], find_particle_bins, 1,
+                                           NULL, &num_p_workitems, &pso.po2_workgroup_size, 0, NULL, NULL));
+
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
+
+    zero_gridcount_device_opencl(pso);
+
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], count_particles_in_bins, 1,
+                                           NULL, &num_p_workitems, &pso.po2_workgroup_size, 0, NULL, NULL));
+
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
+}
+
+static void prefix_sum_device_opencl(psdata_opencl pso)
+{
+    cl_kernel prefix_sum = get_kernel(pso, "prefix_sum");
+
+    ASSERT(prefix_sum != NULL);
 
     size_t num_work_groups = pso.num_blocks;
     size_t num_work_items = num_work_groups * pso.po2_workgroup_size;
 
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_prefix_sum, 1, NULL,
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], prefix_sum, 1, NULL,
                                                &num_work_items, &pso.po2_workgroup_size, 0, NULL, NULL));
 
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
-void copy_celloffset_to_backup_device_opencl(psdata * data) {
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_copy_celloffset_to_backup, NUM_PS_ARGS, sizeof(cl_mem), &pso.backup_prefix_sum));
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_copy_celloffset_to_backup, NUM_PS_ARGS+1, sizeof(unsigned int), &pso.num_grid_cells));
+static void copy_celloffset_to_backup_device_opencl(psdata_opencl pso)
+{
+    cl_kernel copy_celloffset_to_backup = get_kernel(pso, "copy_celloffset_to_backup");
+
+    ASSERT(copy_celloffset_to_backup != NULL);
 
     size_t num_work_items = pso.num_blocks * 2 * pso.po2_workgroup_size;
 
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_copy_celloffset_to_backup, 1, NULL, &num_work_items, &pso.po2_workgroup_size, 0, NULL, NULL));
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], copy_celloffset_to_backup, 1, NULL, &num_work_items, &pso.po2_workgroup_size, 0, NULL, NULL));
 
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
-void insert_particles_in_bin_array_device_opencl(psdata * data) {
+static void insert_particles_in_bin_array_device_opencl(psdata_opencl pso)
+{
     int * pnum_ptr;
 
-    PS_SET_PTR(data, "pnum", int, &pnum_ptr);
+    PS_GET_FIELD(pso.host_psdata, "pnum", int, &pnum_ptr);
     int n = pnum_ptr[1];
 
     size_t num_workgroups = n / pso.po2_workgroup_size + 1;
     size_t num_work_items = num_workgroups * pso.po2_workgroup_size;
 
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_insert_particles_in_bin_array, NUM_PS_ARGS, sizeof(cl_mem), &pso.backup_prefix_sum));
+    cl_kernel insert_particles_in_bin_array = get_kernel(pso, "insert_particles_in_bin_array");
 
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_insert_particles_in_bin_array, 1, NULL, &num_work_items, &pso.po2_workgroup_size, 0, NULL, NULL));
+    ASSERT(insert_particles_in_bin_array != NULL);
+
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], insert_particles_in_bin_array, 1, NULL, &num_work_items, &pso.po2_workgroup_size, 0, NULL, NULL));
     
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
-void find_particle_bins_device_opencl(psdata * data) {
-    size_t max_workgroup_size = WG_FUJ_SZ;
-
-    unsigned int pn = get_field_psdata(data, "pnum");
-    assert(pn != -1);
-
-    unsigned int pnum = *((unsigned int *) ((char*) data->data + data->data_offsets[pn]));
-
-    size_t num_workgroups = pnum / max_workgroup_size + 1;
-    size_t num_workitems = num_workgroups * max_workgroup_size;
-
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_find_particle_bins, 1,
-                                           NULL, &num_workitems, &max_workgroup_size, 0, NULL, NULL));
-
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+void compute_particle_bins_device_opencl(psdata_opencl pso)
+{
+    bin_and_count_device_opencl(pso);
+    prefix_sum_device_opencl(pso);
+    copy_celloffset_to_backup_device_opencl(pso);
+    insert_particles_in_bin_array_device_opencl(pso);
 }
 
-void count_particles_in_bins_device_opencl(psdata * data) {
-    unsigned int max_workgroup_size = WG_FUJ_SZ;
-
-}
-
-void compute_density_device_opencl(psdata * data) {
+void compute_density_device_opencl(psdata_opencl pso)
+{
     unsigned int * n_ptr;
 
-    PS_SET_PTR(data, "n", unsigned int, &n_ptr);
-    unsigned int n = *n_ptr;
-
-    note(2, "n = %d\n", n);
-
-    size_t num_workgroups = n / pso.po2_workgroup_size + 1;
-    size_t num_workitems = num_workgroups * pso.po2_workgroup_size;
-
-    note(2, "Starting density comp with %u workitems, workgroup size %d\n", num_workitems, pso.po2_workgroup_size);
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_compute_density, 1, NULL,
-                                           &num_workitems, &pso.po2_workgroup_size, 0, NULL, NULL));
-    note(2, "Finished\n");
-
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
-}
-
-void compute_forces_device_opencl(psdata * data) {
-    unsigned int * n_ptr;
-
-    PS_SET_PTR(data, "n", unsigned int, &n_ptr);
+    PS_GET_FIELD(pso.host_psdata, "n", unsigned int, &n_ptr);
     unsigned int n = *n_ptr;
 
     size_t num_workgroups = n / pso.po2_workgroup_size + 1;
     size_t num_workitems = num_workgroups * pso.po2_workgroup_size;
-    
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_compute_forces, 1, NULL,
+
+    cl_kernel compute_density = get_kernel(pso, "compute_density");
+
+    ASSERT(compute_density != NULL);
+
+    note(1, "Starting density comp with %u workitems, workgroup size %d\n", num_workitems, pso.po2_workgroup_size);
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], compute_density, 1, NULL,
                                            &num_workitems, &pso.po2_workgroup_size, 0, NULL, NULL));
 
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
-void step_forward_device_opencl(psdata * data) {
+void compute_forces_device_opencl(psdata_opencl pso)
+{
     unsigned int * n_ptr;
 
-    PS_SET_PTR(data, "n", unsigned int, &n_ptr);
+    PS_GET_FIELD(pso.host_psdata, "n", unsigned int, &n_ptr);
     unsigned int n = *n_ptr;
 
     size_t num_workgroups = n / pso.po2_workgroup_size + 1;
     size_t num_workitems = num_workgroups * pso.po2_workgroup_size;
+
+    cl_kernel compute_forces = get_kernel(pso, "compute_forces");
+
+    ASSERT(compute_forces != NULL);
     
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_step_forward, 1, NULL,
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], compute_forces, 1, NULL,
                                            &num_workitems, &pso.po2_workgroup_size, 0, NULL, NULL));
 
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
-void populate_position_cuboid_device_opencl(double x1, double y1, double z1,
+void step_forward_device_opencl(psdata_opencl pso)
+{
+    unsigned int * n_ptr;
+
+    PS_GET_FIELD(pso.host_psdata, "n", unsigned int, &n_ptr);
+    unsigned int n = *n_ptr;
+
+    size_t num_workgroups = n / pso.po2_workgroup_size + 1;
+    size_t num_workitems = num_workgroups * pso.po2_workgroup_size;
+
+    cl_kernel step_forward = get_kernel(pso, "step_forward");
+
+    ASSERT(step_forward != NULL);
+    
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], step_forward, 1, NULL,
+                                           &num_workitems, &pso.po2_workgroup_size, 0, NULL, NULL));
+
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
+}
+
+void call_for_all_particles_device_opencl(psdata_opencl pso, const char * kernel_name)
+{
+    unsigned int * pN;
+
+    PS_GET_FIELD(pso.host_psdata, "n", unsigned int, &pN);
+    unsigned int n = *pN;
+
+    size_t num_workgroups = (n - 1) / pso.po2_workgroup_size + 1;
+    size_t num_workitems = num_workgroups * pso.po2_workgroup_size;
+
+    call_kernel_device_opencl(pso, kernel_name, 1, 0, &num_workitems, &pso.po2_workgroup_size);
+}
+
+void populate_position_cuboid_device_opencl(psdata_opencl pso,
+                                            double x1, double y1, double z1,
                                             double x2, double y2, double z2,
                                             unsigned int xsize,
                                             unsigned int ysize,
                                             unsigned int zsize)
 {
     size_t work_group_edge = (size_t) pow
-        ((double) platforms[0].devices[0].max_workgroup_size, 1.0/3.0);
+        ((double) _platforms[0].devices[0].max_workgroup_size, 1.0/3.0);
     size_t local_work_size[] = { work_group_edge, work_group_edge, work_group_edge };
     size_t global_work_size[] = { (xsize/work_group_edge + 1) * work_group_edge,
                                   (ysize/work_group_edge + 1) * work_group_edge,
@@ -370,14 +489,44 @@ void populate_position_cuboid_device_opencl(double x1, double y1, double z1,
     cl_double3 corner2 = {{ x2, y2, z2 }};
     cl_uint3 size = {{ xsize, ysize, zsize }};
 
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_cuboid, NUM_PS_ARGS, sizeof(cl_double3), &corner1));
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_cuboid, NUM_PS_ARGS+1, sizeof(cl_double3), &corner2));
-    HANDLE_CL_ERROR(clSetKernelArg(pso.kern_cuboid, NUM_PS_ARGS+2, sizeof(cl_uint3), &size));
+    cl_kernel cuboid = get_kernel(pso, "populate_position_cuboid");
 
-    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(command_queues[0], pso.kern_cuboid, 3, NULL,
+    ASSERT(cuboid != NULL);
+
+    HANDLE_CL_ERROR(clSetKernelArg(cuboid, NUM_PS_ARGS, sizeof(cl_double3), &corner1));
+    HANDLE_CL_ERROR(clSetKernelArg(cuboid, NUM_PS_ARGS+1, sizeof(cl_double3), &corner2));
+    HANDLE_CL_ERROR(clSetKernelArg(cuboid, NUM_PS_ARGS+2, sizeof(cl_uint3), &size));
+
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], cuboid, 3, NULL,
                                            global_work_size, local_work_size,
                                            0, NULL, NULL));
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
+}
+
+void rotate_particles_device_opencl(psdata_opencl pso, double angle_x, double angle_y, double angle_z)
+{
+    unsigned int * pN;
+
+    PS_GET_FIELD(pso.host_psdata, "n", unsigned int, &pN);
+
+    unsigned int n = *pN;
+
+    size_t num_workgroups = n / pso.po2_workgroup_size + 1;
+    size_t num_workitems = num_workgroups * pso.po2_workgroup_size;
+
+    cl_kernel rotate_particles = get_kernel(pso, "rotate_particles");
+
+    ASSERT(rotate_particles != NULL);
+
+    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS, sizeof(cl_double), &angle_x));
+    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS+1, sizeof(cl_double), &angle_y));
+    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS+2, sizeof(cl_double), &angle_z));
+
+    HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], rotate_particles, 1, NULL,
+                                           &num_workitems, &pso.po2_workgroup_size,
+                                           0, NULL, NULL));
+
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
 /**
@@ -389,8 +538,11 @@ void populate_position_cuboid_device_opencl(double x1, double y1, double z1,
  * @param data The host buffer to copy
  * @return Buffer list referencing the newly created device side buffer
  */
-psdata_opencl create_psdata_opencl(psdata * data) {
-    psdata_opencl bl;
+psdata_opencl create_psdata_opencl(psdata * data, const char * file_list)
+{
+    psdata_opencl pso;
+
+    pso.host_psdata = *data;
 
     cl_mem_flags flags = CL_MEM_COPY_HOST_PTR;
 
@@ -400,24 +552,24 @@ psdata_opencl create_psdata_opencl(psdata * data) {
 
     unsigned int fmsize = nf*sizeof(unsigned int);
 
-    bl.num_fields = nf;
-    bl.names = clCreateBuffer(context, flags, psdata_names_size(data), (char*) data->names, &error);
+    pso.num_fields = nf;
+    pso.names = clCreateBuffer(_context, flags, psdata_names_size(data), (char*) data->names, &error);
     HANDLE_CL_ERROR(error);
-    bl.names_offsets = clCreateBuffer(context, flags, fmsize, data->names_offsets, &error);
+    pso.names_offsets = clCreateBuffer(_context, flags, fmsize, data->names_offsets, &error);
     HANDLE_CL_ERROR(error);
-    bl.dimensions = clCreateBuffer(context, flags, psdata_dimensions_size(data), data->dimensions, &error);
+    pso.dimensions = clCreateBuffer(_context, flags, psdata_dimensions_size(data), data->dimensions, &error);
     HANDLE_CL_ERROR(error);
-    bl.num_dimensions = clCreateBuffer(context, flags, fmsize, data->num_dimensions, &error);
+    pso.num_dimensions = clCreateBuffer(_context, flags, fmsize, data->num_dimensions, &error);
     HANDLE_CL_ERROR(error);
-    bl.dimensions_offsets = clCreateBuffer(context, flags, fmsize, data->dimensions_offsets, &error);
+    pso.dimensions_offsets = clCreateBuffer(_context, flags, fmsize, data->dimensions_offsets, &error);
     HANDLE_CL_ERROR(error);
-    bl.entry_sizes = clCreateBuffer(context, flags, fmsize, data->entry_sizes, &error);
+    pso.entry_sizes = clCreateBuffer(_context, flags, fmsize, data->entry_sizes, &error);
     HANDLE_CL_ERROR(error);
-    bl.data = clCreateBuffer(context, flags, psdata_data_size(data), data->data, &error);
+    pso.data = clCreateBuffer(_context, flags, psdata_data_size(data), data->data, &error);
     HANDLE_CL_ERROR(error);
-    bl.data_sizes = clCreateBuffer(context, flags, fmsize, data->data_sizes, &error);
+    pso.data_sizes = clCreateBuffer(_context, flags, fmsize, data->data_sizes, &error);
     HANDLE_CL_ERROR(error);
-    bl.data_offsets = clCreateBuffer(context, flags, fmsize, data->data_offsets, &error);
+    pso.data_offsets = clCreateBuffer(_context, flags, fmsize, data->data_offsets, &error);
     HANDLE_CL_ERROR(error);
 
     /* Now calculate device specific sim variables */
@@ -425,160 +577,165 @@ psdata_opencl create_psdata_opencl(psdata * data) {
     unsigned int max_workgroup_size = WG_FUJ_SZ;
 
     unsigned int * gridres;
-    PS_SET_PTR(data, "gridres", unsigned int, &gridres);
+    PS_GET_FIELD(*data, "gridres", unsigned int, &gridres);
 
-    bl.num_grid_cells = gridres[0]*gridres[1]*gridres[2];
+    pso.num_grid_cells = gridres[0]*gridres[1]*gridres[2];
 
     size_t po2_workgroup_size = 1;
     while (po2_workgroup_size<<1 < max_workgroup_size/* &&
-           po2_workgroup_size<<1 < bl.num_grid_cells*/) po2_workgroup_size <<= 1;
+           po2_workgroup_size<<1 < pso.num_grid_cells*/) po2_workgroup_size <<= 1;
 
-    bl.po2_workgroup_size = po2_workgroup_size;
+    pso.po2_workgroup_size = po2_workgroup_size;
 
-    bl.num_blocks = (bl.num_grid_cells - 1) / (2*po2_workgroup_size) + 1;
+    pso.num_blocks = (pso.num_grid_cells - 1) / (2*po2_workgroup_size) + 1;
 
-    build_program(data, &bl);
-    assign_pso_kernel_args(bl);
+    build_program(data, &pso, file_list);
+    create_kernels(&pso);
 
-    bl.block_totals = clCreateBuffer(context, CL_MEM_READ_WRITE, bl.num_blocks*sizeof(unsigned int), NULL, &error);
+    pso.block_totals = clCreateBuffer(_context, CL_MEM_READ_WRITE, pso.num_blocks*sizeof(unsigned int), NULL, &error);
     HANDLE_CL_ERROR(error);
 
-    bl.backup_prefix_sum = clCreateBuffer(context, CL_MEM_READ_WRITE, bl.num_grid_cells*sizeof(unsigned int), NULL, &error);
+    pso.backup_prefix_sum = clCreateBuffer(_context, CL_MEM_READ_WRITE, pso.num_grid_cells*sizeof(unsigned int), NULL, &error);
     HANDLE_CL_ERROR(error);
 
-    return bl;
+    assign_pso_kernel_args(pso);
+
+    return pso;
 }
 
+#ifdef MATLAB_MEX_FILE
 /**
- * Use specified buffer in computations
+ * Feed specified buffer to kernel PSO_ARGS
  *
- * Sets the arguments of kernels using psdata to this buflist
- *
- * @param bl Buffer list to use
+ * @param pso Buffer list to use
  */
-void opencl_use_buflist(psdata_opencl bl) {
-    pso = bl;
+void opencl_use_buflist(psdata_opencl pso)
+{
+    _pso = pso;
+}
+#endif
+
+void assign_pso_kernel_args(psdata_opencl pso)
+{
+    for (size_t i = 0; i < pso.num_kernels; ++i) {
+        set_kernel_args_to_pso(pso, pso.kernels[i]);
+    }
+
+    cl_kernel prefix_sum = get_kernel(pso, "prefix_sum");
+
+    ASSERT(prefix_sum != NULL);
+
+    HANDLE_CL_ERROR(clSetKernelArg(prefix_sum, NUM_PS_ARGS, 2*pso.po2_workgroup_size*sizeof(unsigned int), NULL));
+    HANDLE_CL_ERROR(clSetKernelArg(prefix_sum, NUM_PS_ARGS + 1, sizeof(unsigned int), &pso.num_grid_cells));
+    HANDLE_CL_ERROR(clSetKernelArg(prefix_sum, NUM_PS_ARGS + 2, sizeof(cl_mem), &pso.block_totals));
+    HANDLE_CL_ERROR(clSetKernelArg(prefix_sum, NUM_PS_ARGS + 3, sizeof(unsigned int), &pso.num_blocks));
+
+    cl_kernel copy_celloffset_to_backup = get_kernel(pso, "copy_celloffset_to_backup");
+
+    ASSERT(copy_celloffset_to_backup != NULL);
+
+    HANDLE_CL_ERROR(clSetKernelArg(copy_celloffset_to_backup, NUM_PS_ARGS, sizeof(cl_mem), &pso.backup_prefix_sum));
+    HANDLE_CL_ERROR(clSetKernelArg(copy_celloffset_to_backup, NUM_PS_ARGS+1, sizeof(unsigned int), &pso.num_grid_cells));
+
+    cl_kernel insert_particles_in_bin_array = get_kernel(pso, "insert_particles_in_bin_array");
+
+    ASSERT(insert_particles_in_bin_array != NULL);
+
+    HANDLE_CL_ERROR(clSetKernelArg(insert_particles_in_bin_array, NUM_PS_ARGS, sizeof(cl_mem), &pso.backup_prefix_sum));
 }
 
-void assign_pso_kernel_args(psdata_opencl bl) {
-    set_kernel_args_to_pso(bl, bl.kern_cuboid);
-    set_kernel_args_to_pso(bl, bl.kern_find_particle_bins);
-    set_kernel_args_to_pso(bl, bl.kern_count_particles_in_bins);
-    set_kernel_args_to_pso(bl, bl.kern_prefix_sum);
-    set_kernel_args_to_pso(bl, bl.kern_copy_celloffset_to_backup);
-    set_kernel_args_to_pso(bl, bl.kern_insert_particles_in_bin_array);
-
-    set_kernel_args_to_pso(bl, bl.kern_compute_density);
-    set_kernel_args_to_pso(bl, bl.kern_compute_forces);
-    set_kernel_args_to_pso(bl, bl.kern_step_forward);
-}
-
-void set_kernel_args_to_pso(psdata_opencl bl, cl_kernel kernel) {
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 0, sizeof(unsigned int), &bl.num_fields));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 1, sizeof(cl_mem), &bl.names));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 2, sizeof(cl_mem), &bl.names_offsets));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 3, sizeof(cl_mem), &bl.dimensions));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 4, sizeof(cl_mem), &bl.num_dimensions));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 5, sizeof(cl_mem), &bl.dimensions_offsets));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 6, sizeof(cl_mem), &bl.entry_sizes));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 7, sizeof(cl_mem), &bl.data));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 8, sizeof(cl_mem), &bl.data_sizes));
-    HANDLE_CL_ERROR(clSetKernelArg(kernel, 9, sizeof(cl_mem), &bl.data_offsets));
+void set_kernel_args_to_pso(psdata_opencl pso, cl_kernel kernel)
+{
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 0, sizeof(unsigned int), &pso.num_fields));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 1, sizeof(cl_mem), &pso.names));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 2, sizeof(cl_mem), &pso.names_offsets));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 3, sizeof(cl_mem), &pso.dimensions));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 4, sizeof(cl_mem), &pso.num_dimensions));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 5, sizeof(cl_mem), &pso.dimensions_offsets));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 6, sizeof(cl_mem), &pso.entry_sizes));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 7, sizeof(cl_mem), &pso.data));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 8, sizeof(cl_mem), &pso.data_sizes));
+    HANDLE_CL_ERROR(clSetKernelArg(kernel, 9, sizeof(cl_mem), &pso.data_offsets));
 }
 
 /**
  * Release referenced buffer
  */
-void free_psdata_opencl(psdata_opencl bl) {
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.names));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.names_offsets));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.dimensions));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.num_dimensions));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.dimensions_offsets));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.entry_sizes));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.data));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.data_sizes));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.data_offsets));
-    HANDLE_CL_ERROR(clReleaseMemObject(bl.block_totals));
+void free_psdata_opencl(psdata_opencl * pso)
+{
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->names));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->names_offsets));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->dimensions));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->num_dimensions));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->dimensions_offsets));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->entry_sizes));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->data));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->data_sizes));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->data_offsets));
+    HANDLE_CL_ERROR(clReleaseMemObject(pso->block_totals));
 
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_cuboid));
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_find_particle_bins));
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_count_particles_in_bins));
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_prefix_sum));
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_copy_celloffset_to_backup));
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_insert_particles_in_bin_array));
+    for (size_t i = 0; i < pso->num_kernels; ++i) {
+        HANDLE_CL_ERROR(clReleaseKernel(pso->kernels[i]));
+        free(*((char**) pso->kernel_names + i));
+    }
 
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_compute_density));
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_compute_forces));
-    HANDLE_CL_ERROR(clReleaseKernel(bl.kern_step_forward));
+    free((void*)pso->kernels);
+    free((void*)pso->kernel_names);
 
-    HANDLE_CL_ERROR(clReleaseProgram(bl.ps_prog));
+    pso->num_kernels = 0;
+
+    HANDLE_CL_ERROR(clReleaseProgram(pso->ps_prog));
 }
 
 /**
  * Copy buffer data from device to host
  *
  * @param data Host buffer
- * @param bl Device buffer list
+ * @param pso Device buffer list
  */
-void sync_psdata_host_to_device(psdata * data, psdata_opencl bl) {
+void sync_psdata_host_to_device(psdata * data, psdata_opencl pso, int full)
+{
     unsigned int nf = data->num_fields;
 
     unsigned int fmsize = nf*sizeof(unsigned int);
 
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.names, CL_FALSE, 0,
-                                         psdata_names_size(data), (char*) data->names, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.names_offsets, CL_FALSE, 0,
-                                         fmsize, data->names_offsets, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.dimensions, CL_FALSE, 0, 
-                                         psdata_dimensions_size(data), data->dimensions, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.num_dimensions, CL_FALSE, 0, 
-                                         fmsize, data->num_dimensions, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.dimensions_offsets, CL_FALSE, 0,
-                                         fmsize, data->dimensions_offsets, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.entry_sizes, CL_FALSE, 0,
-                                         fmsize, data->entry_sizes, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.data, CL_FALSE, 0,
+    HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.data, CL_FALSE, 0,
                                          psdata_data_size(data), data->data, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.data_sizes, CL_FALSE, 0,
-                                         fmsize, data->data_sizes, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueWriteBuffer(command_queues[0], bl.data_offsets, CL_FALSE, 0,
-                                         fmsize, data->data_offsets, 0, NULL, NULL));
 
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    if (full) {
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.names, CL_FALSE, 0,
+                                             psdata_names_size(data), (char*) data->names, 0, NULL, NULL));
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.names_offsets, CL_FALSE, 0,
+                                             fmsize, data->names_offsets, 0, NULL, NULL));
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.dimensions, CL_FALSE, 0, 
+                                             psdata_dimensions_size(data), data->dimensions, 0, NULL, NULL));
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.num_dimensions, CL_FALSE, 0, 
+                                             fmsize, data->num_dimensions, 0, NULL, NULL));
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.dimensions_offsets, CL_FALSE, 0,
+                                             fmsize, data->dimensions_offsets, 0, NULL, NULL));
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.entry_sizes, CL_FALSE, 0,
+                                             fmsize, data->entry_sizes, 0, NULL, NULL));
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.data_sizes, CL_FALSE, 0,
+                                             fmsize, data->data_sizes, 0, NULL, NULL));
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.data_offsets, CL_FALSE, 0,
+                                             fmsize, data->data_offsets, 0, NULL, NULL));
+    }
+
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
 /**
  * Copy buffer data from host to device
  *
  * @param data Host buffer
- * @param bl Device buffer list
+ * @param pso Device buffer list
  */
-void sync_psdata_device_to_host(psdata * data, psdata_opencl bl) {
-    unsigned int nf = data->num_fields;
-
-    unsigned int fmsize = nf*sizeof(unsigned int);
-
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.names, CL_FALSE, 0,
-                                         psdata_names_size(data), data->names, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.names_offsets, CL_FALSE, 0,
-                                         fmsize, data->names_offsets, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.dimensions, CL_FALSE, 0, 
-                                         psdata_dimensions_size(data), data->dimensions, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.num_dimensions, CL_FALSE, 0, 
-                                         fmsize, data->num_dimensions, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.dimensions_offsets, CL_FALSE, 0,
-                                         fmsize, data->dimensions_offsets, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.entry_sizes, CL_FALSE, 0,
-                                         fmsize, data->entry_sizes, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.data, CL_FALSE, 0,
+void sync_psdata_device_to_host(psdata * data, psdata_opencl pso)
+{
+    HANDLE_CL_ERROR(clEnqueueReadBuffer(_command_queues[0], pso.data, CL_FALSE, 0,
                                          psdata_data_size(data), data->data, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.data_sizes, CL_FALSE, 0,
-                                         fmsize, data->data_sizes, 0, NULL, NULL));
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(command_queues[0], bl.data_offsets, CL_FALSE, 0,
-                                         fmsize, data->data_offsets, 0, NULL, NULL));
 
-    HANDLE_CL_ERROR(clFinish(command_queues[0]));
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
 /**
@@ -587,17 +744,18 @@ void sync_psdata_device_to_host(psdata * data, psdata_opencl bl) {
  * Releases command queues and context. Does not release any buffers,
  * though they may be invalid without the context.
  */
-void terminate_ps_opencl() {
+void terminate_opencl()
+{
     free_opencl_platform_info();
 
-    int i;
-    for (i = 0; i < num_command_queues; ++i) {
-        HANDLE_CL_ERROR(clReleaseCommandQueue(command_queues[i]));
+    unsigned int i;
+    for (i = 0; i < _num_command_queues; ++i) {
+        HANDLE_CL_ERROR(clReleaseCommandQueue(_command_queues[i]));
     }
 
-    free(command_queues);
+    free(_command_queues);
 
-    HANDLE_CL_ERROR(clReleaseContext(context));
+    HANDLE_CL_ERROR(clReleaseContext(_context));
 
-    ready = 0;
+    _ready = 0;
 }

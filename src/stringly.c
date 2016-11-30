@@ -21,3 +21,4 @@ size_t sizeof_string_type(const char * type) {
 
     return 0;
 }
+

@@ -1,113 +1,69 @@
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "build_psdata.h"
+#include "config.h"
 #include "note.h"
 #include "particle_system.h"
 #include "opencl/particle_system_host.h"
 #include "3rdparty/whereami.h"
 
-int main() {
+#define PI 3.1415926535
+
+void printFieldOffsets(psdata data) {
+    for (size_t i = 0; i < data.num_fields; ++i) {
+        note(2, "%s: %u\n", data.names + data.names_offsets[i], data.data_offsets[i]);
+    }
+}
+
+int main(int argc, char *argv[])
+{
     set_log_level(1);
     psdata data;
-    psdata * d = &data;
 
-    int exe_path_len = wai_getExecutablePath(NULL, 0, NULL);
-    char * exe_path = malloc((exe_path_len+1)*sizeof(char));
-    wai_getExecutablePath(exe_path, exe_path_len, NULL);
+    load_config("/../conf/solid.conf");
 
-    exe_path[exe_path_len] = 0x0;
-    char * lastslash = strrchr(exe_path, '/');
+    build_psdata_from_string(&data, get_config_section("psdata_specification"));
 
-    if (lastslash != NULL) {
-        exe_path_len = (int)( (lastslash - exe_path) / sizeof(char) );
-        exe_path[exe_path_len] = 0x0;
-    }
-
-    const char * kern_rel_path = "/../conf/fluid.conf";
-
-    char * kern_path = malloc((strlen(exe_path)+strlen(kern_rel_path)+1)*sizeof(char));
-    sprintf(kern_path, "%s%s", exe_path, kern_rel_path);
-
-    build_psdata(d, kern_path);
-
-    free(exe_path); free(kern_path);
-
-    unsigned int * gridcell;
-    unsigned int * gridcount;
-    unsigned int * celloffset;
-    unsigned int * cellparticles;
     double * position;
-    double * density;
+    double * originalpos;
+    double * density0;
 
-    PS_SET_PTR(d, "gridcell", unsigned int, &gridcell);
-    PS_SET_PTR(d, "gridcount", unsigned int, &gridcount);
-    PS_SET_PTR(d, "celloffset", unsigned int, &celloffset);
-    PS_SET_PTR(d, "cellparticles", unsigned int, &cellparticles);
-    PS_SET_PTR(d, "force", double, &position);
-    PS_SET_PTR(d, "density", double, &density);
+    double * rotation;
 
-    init_ps_opencl();
-        psdata_opencl bl = create_psdata_opencl(d);
-            opencl_use_buflist(bl);
+    PS_GET_FIELD(data, "position", double, &position);
+    PS_GET_FIELD(data, "originalpos", double, &originalpos);
+    PS_GET_FIELD(data, "density0", double, &density0);
 
-            populate_position_cuboid_device_opencl(0.5, 0.5, 0.5, 2.5, 2.5, 2.5, 3, 3, 3);
+    PS_GET_FIELD(data, "rotation", double, &rotation);
 
-            sync_psdata_device_to_host(d, bl);
+    init_opencl();
+        psdata_opencl pso = create_psdata_opencl(&data, get_config_section("opencl_kernel_files"));
+            populate_position_cuboid_device_opencl(pso, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 6, 6, 6);
+            call_for_all_particles_device_opencl(pso, "init_original_position");
+            rotate_particles_device_opencl(pso, PI/4, 0, PI/6);
 
-            // The 1 at the end of celloffset is nothing to do with prefix sum
-            bin_and_count_device_opencl(d);
-            prefix_sum_device_opencl(d);
-            copy_celloffset_to_backup_device_opencl(d);
-            insert_particles_in_bin_array_device_opencl(d);
+            compute_particle_bins_device_opencl(pso);
 
-            compute_density_device_opencl(d);
-            compute_forces_device_opencl(d);
+            call_for_all_particles_device_opencl(pso, "compute_original_density");
+            call_for_all_particles_device_opencl(pso, "compute_density");
 
-            step_forward_device_opencl(d);
+            call_for_all_particles_device_opencl(pso, "compute_rotations_and_strains");
+
+            call_for_all_particles_device_opencl(pso, "compute_stresses");
+            call_for_all_particles_device_opencl(pso, "compute_forces_solids");
+
+            call_for_all_particles_device_opencl(pso, "step_forward");
         
-            sync_psdata_device_to_host(d, bl);
-        free_psdata_opencl(bl);
-    terminate_ps_opencl();
+            sync_psdata_device_to_host(&data, pso);
+        free_psdata_opencl(&pso);
+    terminate_opencl();
 
-    int i;
+    unload_config();
 
-    note(2, "Num grid cells: %u\n", bl.num_grid_cells);
+    display_psdata(data, NULL);
 
-    for (i = 0; i < 64; ++i) {
-        note(2, "%.4g, %.4g, %.4g\n", position[i*3], position[i*3 + 1], position[i*3 + 2]);
-    }
+    free_psdata(&data);
 
-    note(2, "Particle cells\n");
-    for (i = 0; i < 64; ++i) {
-        note(2, "%d, ", gridcell[i]);
-    }
-    note(2, "\n");
-
-    note(2, "Grid cell counts\n");
-    for (i = 0; i < 64; ++i) {
-        note(2, "%d, ", gridcount[i]);
-    }
-    note(2, "\n");
-
-    note(2, "Grid cell prefix sum\n");
-    for (i = 0; i < 64; ++i) {
-        note(2, "%d, ", celloffset[i]);
-    }
-    note(2, "\n");
-
-    note(2, "Cell particles\n");
-    for (i = 0; i < 64; ++i) {
-        note(2, "%d, ", cellparticles[i]);
-    }
-    note(2, "\n");
-    
-    note(2, "Density\n");
-    for (i = 0; i < 64; ++i) {
-        note(2, "%g, ", density[i]);
-    }
-    note(2, "\n");
-    
     return 0;
 }

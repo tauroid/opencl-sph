@@ -18,9 +18,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
     compute_particle_bins_device_opencl(*pso);
 
     call_for_all_particles_device_opencl(*pso, "compute_density");
-    call_for_all_particles_device_opencl(*pso, "compute_rotations_and_strains");
-    call_for_all_particles_device_opencl(*pso, "compute_stresses");
-    call_for_all_particles_device_opencl(*pso, "compute_forces_solids");
+    call_for_all_particles_device_opencl(*pso, "compute_forces_fluids");
 
     call_for_all_particles_device_opencl(*pso, "step_forward");
 }

@@ -8,12 +8,12 @@
 
 void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
     psdata * data = get_stored_psdata();
-    psdata_opencl pso = get_stored_psdata_opencl();
+    psdata_opencl * pso = get_stored_psdata_opencl();
 
-    if (data == NULL) mexErrMsgIdAndTxt("QueryState:InitError", "Module not initialised");
+    if (data == NULL || pso == NULL) mexErrMsgIdAndTxt("QueryState:InitError", "Module not initialised");
     if (nlhs < nrhs && nlhs > 1) mexErrMsgIdAndTxt("QueryState:ArgError", "Not enough return arguments");
 
-    sync_psdata_device_to_host(data, pso);
+    sync_psdata_device_to_host(data, *pso);
     sync_to_mex(data);
 
     char ** strarg = calloc(nrhs, sizeof(char*));
@@ -31,7 +31,6 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
                     break;
                 }
             }
-            note(2, "%s\n", strarg[i]);
         }
     }
     

@@ -1,3 +1,6 @@
+#ifndef PLATFORM_INFO_H_
+#define PLATFORM_INFO_H_
+
 #include <CL/opencl.h>
 
 typedef struct {
@@ -27,3 +30,5 @@ typedef struct {
 
 void get_opencl_platform_info(Platform const ** const pptr, unsigned int * const npptr);
 void free_opencl_platform_info();
+
+#endif

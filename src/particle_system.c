@@ -5,6 +5,7 @@
 #else
     #include "mex.h"
 #endif
+#include "note.h"
 #include "particle_system.h"
 #include "build_psdata.h"
 #include "opencl/particle_system_host.h"
@@ -12,12 +13,12 @@
 static psdata * ps_instance = NULL;
 
 #ifdef MATLAB_MEX_FILE
-psdata * create_stored_psdata_from_conf(const char * path) {
+psdata * create_stored_psdata_from_string(const char * string) {
     ps_instance = malloc(sizeof(psdata));
 
     ps_instance->num_fields = 0;
 
-    build_psdata(ps_instance, path);
+    build_psdata_from_string(ps_instance, string);
 
     return ps_instance;
 }
@@ -32,6 +33,51 @@ void free_stored_psdata() {
     free(ps_instance);
 }
 #endif
+
+void display_entry(psdata data, size_t offset, size_t size) {
+    if (size == 8) {
+        note(2, "%g, ", *((double*)((char*)data.data + offset)));
+    } else if (size == 4) {
+        note(2, "%u, ", *((unsigned int*)((char*)data.data + offset)));
+    }
+}
+
+void display_psdata(psdata data, const char * const * mask) {
+    if (mask == NULL) {
+        for (size_t field = 0; field < data.num_fields; ++field) {
+            note(2, "%s:\n\n", data.names + data.names_offsets[field]);
+            if (data.num_dimensions[field] == 1) {
+                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
+                for (size_t i = 0; i < d0; ++i) {
+                    display_entry(data, data.data_offsets[field] + i*data.entry_sizes[field], data.entry_sizes[field]);
+                }
+            } else if (data.num_dimensions[field] == 2) {
+                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
+                unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
+                for (unsigned int i = 0; i < d1; ++i) {
+                    for (unsigned int j = 0; j < d0; ++j) {
+                        display_entry(data, data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field], data.entry_sizes[field]);
+                    }
+                    note(2, "\n");
+                }
+            } else if (data.num_dimensions[field] == 3) {
+                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
+                unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
+                unsigned int d2 = (data.dimensions + data.dimensions_offsets[field])[2];
+                for (unsigned int i = 0; i < d2; ++i) {
+                    for (unsigned int j = 0; j < d1; ++j) {
+                        for (unsigned int k = 0; k < d0; ++k) {
+                            display_entry(data, data.data_offsets[field] + (i*d1*d0+j*d0+k)*data.entry_sizes[field], data.entry_sizes[field]);
+                        }
+                        note(2, "\n");
+                    }
+                    note(2, "\n");
+                }
+            }
+            note(2, "\n\n");
+        }
+    }
+}
 
 void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, double smoothingradius,
                         double xbound1, double ybound1, double zbound1,
@@ -63,7 +109,7 @@ void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, d
         "cellparticles"
     };
 
-    int i;
+    unsigned int i;
     unsigned int sum = 0;
 
     data->num_fields = sizeof(names_ref)/sizeof(char*);
@@ -83,9 +129,9 @@ void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, d
     }
     }
 
-    unsigned int num_gridcells_x = (unsigned int) (abs(xbound2 - xbound1) / smoothingradius);
-    unsigned int num_gridcells_y = (unsigned int) (abs(ybound2 - ybound1) / smoothingradius);
-    unsigned int num_gridcells_z = (unsigned int) (abs(zbound2 - zbound1) / smoothingradius);
+    unsigned int num_gridcells_x = (unsigned int) (fabs(xbound2 - xbound1) / smoothingradius);
+    unsigned int num_gridcells_y = (unsigned int) (fabs(ybound2 - ybound1) / smoothingradius);
+    unsigned int num_gridcells_z = (unsigned int) (fabs(zbound2 - zbound1) / smoothingradius);
 
     { /* Dimensions */
     unsigned int dimensions[] = {
@@ -147,7 +193,7 @@ void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, d
     memcpy(data->num_dimensions, num_dimensions, data->num_fields*sizeof(unsigned int));
     memcpy(data->entry_sizes,    entry_sizes,    data->num_fields*sizeof(unsigned int));
 
-    int i;
+    unsigned int i;
     unsigned int sum = 0;
     for (i = 0; i < data->num_fields; ++i) {
         data->dimensions_offsets[i] = sum;
@@ -165,7 +211,7 @@ void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, d
     data->data_sizes = malloc(data->num_fields*sizeof(unsigned int));
     data->data_offsets = malloc(data->num_fields*sizeof(unsigned int));
 
-    int i, j;
+    unsigned int i, j;
     for (i = 0; i < data->num_fields; ++i) {
         field_data_size = data->entry_sizes[i];
 
@@ -252,17 +298,17 @@ void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, d
     }
 }
 
-int get_field_psdata(psdata * data, const char * name) {
-    int i;
-    for (i = 0; i < data->num_fields; ++i) {
-        if (strcmp(data->names + data->names_offsets[i], name) == 0) return i;
+int get_field_psdata(psdata data, const char * name) {
+    unsigned int i;
+    for (i = 0; i < data.num_fields; ++i) {
+        if (strcmp(data.names + data.names_offsets[i], name) == 0) return i;
     }
 
     return -1;
 }
 
 void set_field_psdata(psdata * data, const char * name, void * field, unsigned int size, unsigned int offset) {
-    int i = get_field_psdata(data, name);
+    int i = get_field_psdata(*data, name);
 
     if (i != -1) memcpy(data->data + data->data_offsets[i] + offset, field, size);
 }
@@ -293,7 +339,7 @@ int create_host_field_psdata(psdata * data, const char * name, void * field, uns
     unsigned int * new_host_data_size = malloc(new_num_host_fields*sizeof(unsigned int));
 
     /* Copy */
-    int i;
+    unsigned int i;
     for (i = 0; i < data->num_host_fields; ++i) {
         new_host_names[i] = data->host_names[i];
         new_host_data[i] = data->host_data[i];
@@ -326,7 +372,7 @@ int create_host_field_psdata(psdata * data, const char * name, void * field, uns
 }
 
 int get_host_field_psdata(psdata * data, const char * name) {
-    int i;
+    unsigned int i;
     for (i = 0; i < data->num_host_fields; ++i) {
         if (strcmp(data->host_names[i], name) == 0) return i;
     }
@@ -349,7 +395,7 @@ void sync_to_mex(psdata * data) {
         char * field_name = malloc((name_length + 1)*sizeof(char));
         strncpy(field_name, data->host_names[i], name_length);
         field_name[name_length] = '\0';
-        f = get_field_psdata(data, field_name);
+        f = get_field_psdata(*data, field_name);
 
         free(field_name);
 
@@ -399,7 +445,7 @@ void free_psdata( psdata * data ) {
     free(data->data_sizes);
     free(data->data_offsets);
 
-    int i;
+    unsigned int i;
     for (i = 0; i < data->num_host_fields; ++i) {
 #ifdef MATLAB_MEX_FILE
         if (is_mex_field(data->host_names[i])) mxDestroyArray(data->host_data[i]);

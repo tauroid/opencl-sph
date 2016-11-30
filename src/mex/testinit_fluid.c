@@ -7,8 +7,6 @@
 #include "../particle_system.h"
 #include "../opencl/particle_system_host.h"
 
-#define PI 3.1415926535
-
 static psdata * data = NULL;
 static psdata_opencl pso;
 
@@ -29,9 +27,9 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
     mexAtExit(onExit);
 
     /* Config file to use */
-    load_config("/../../conf/solid.conf");
+    load_config("/../../conf/fluid.conf");
 
-    /* Create a psdata instance from config and store it internally */
+    /* Create a psdata instance from fluid.conf and store it internally */
     create_stored_psdata_from_string(get_config_section("psdata_specification"));
 
     data = get_stored_psdata();
@@ -50,17 +48,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
 
     unload_config();
 
-    /* Create some particles, store their initial positions (needed for elasticity),
-     * and rotate them so something interesting happens when they fall
-     */
+    /* Create some particles */
     populate_position_cuboid_device_opencl(pso, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 8, 8, 8);
-    call_for_all_particles_device_opencl(pso, "init_original_position");
-    rotate_particles_device_opencl(pso, PI/3, 0, 0);
-
-    /* Compute the grid mapping - need this to compute density */
-    compute_particle_bins_device_opencl(pso);
-
-    call_for_all_particles_device_opencl(pso, "compute_original_density");
 
     /* Return the particles to the host so we can call kernels with the right amount */
     sync_psdata_device_to_host(data, pso);

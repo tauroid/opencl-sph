@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <math.h>
+
+#include "macros.h"
 #include "build_psdata.h"
 #include "note.h"
 #include "particle_system.h"
@@ -10,7 +13,6 @@
     #include "mex.h"
 #endif
 
-struct psdata_field_spec;
 typedef struct psdata_field_spec psdata_field_spec;
 
 struct psdata_field_spec
@@ -18,48 +20,37 @@ struct psdata_field_spec
     char * name;
     unsigned int num_dimensions;
     unsigned int * dimensions;
-    char * type;
+    char * type; // Only double and unsigned int for now
     void * data; /* Optional */
 
     psdata_field_spec * next;
 };
 
-psdata_field_spec * create_psdata_field_spec(char * line, psdata_field_spec * previous, psdata_field_spec * list);
-void populate_psdata(psdata * data, psdata_field_spec * list);
-void free_psdata_field_spec_list(psdata_field_spec * list);
-void add_grid_arrays(psdata_field_spec * list);
-psdata_field_spec * get_field_spec_by_name(psdata_field_spec * list, const char * spec);
-unsigned int get_value(psdata_field_spec * list, const char * name);
+static psdata_field_spec * get_field_spec_by_name(psdata_field_spec * list, const char * name) {
+    psdata_field_spec * field_cursor = list;
 
-void build_psdata_from_string(psdata * data, char * string) {
-    char * endstring = string + strlen(string);
-    char * endline = string - 1;
+    while (field_cursor != NULL) {
+        if (strcmp(field_cursor->name, name) == 0) {
+            return field_cursor;
+        }
 
-    psdata_field_spec * first = NULL;
-    psdata_field_spec * current = NULL;
-
-    while (endline < endstring) {
-        char * line = strtok(endline + 1, "\n");
-        if (line == NULL) continue;
-
-        endline = line + strlen(line);
-
-        if (endline > line && line[0] == '#') continue;
-
-        current = create_psdata_field_spec(line, current, first);
-
-        if (first == NULL) first = current;
+        field_cursor = field_cursor->next;
     }
 
-    add_grid_arrays(first);
+    return NULL;
+}
+static unsigned int get_value(psdata_field_spec * list, const char * name) { // Only for dimensions really
+    psdata_field_spec * field_spec = get_field_spec_by_name(list, name);
 
-    populate_psdata(data, first);
+    if (field_spec != NULL) {
+        return *((unsigned int *)field_spec->data);
+    }
 
-    free_psdata_field_spec_list(first);
+    return UINT_MAX;
 }
 
 /* Depends on smoothingradius, gridbounds & pnum */
-void add_grid_arrays(psdata_field_spec * list) {
+static void add_grid_arrays(psdata_field_spec * list) {
     psdata_field_spec * last = list;
 
     while (last != NULL && last->next != NULL) last = last->next;
@@ -84,9 +75,9 @@ void add_grid_arrays(psdata_field_spec * list) {
         return;
     }
 
-    unsigned int num_gridcells_x = abs(gridbounds[1] - gridbounds[0])/smoothingradius;
-    unsigned int num_gridcells_y = abs(gridbounds[3] - gridbounds[2])/smoothingradius;
-    unsigned int num_gridcells_z = abs(gridbounds[5] - gridbounds[4])/smoothingradius;
+    unsigned int num_gridcells_x = (unsigned int) (fabs(gridbounds[1] - gridbounds[0])/smoothingradius);
+    unsigned int num_gridcells_y = (unsigned int) (fabs(gridbounds[3] - gridbounds[2])/smoothingradius);
+    unsigned int num_gridcells_z = (unsigned int) (fabs(gridbounds[5] - gridbounds[4])/smoothingradius);
 
     char * name;
     unsigned int dimensions[5];
@@ -171,33 +162,7 @@ void add_grid_arrays(psdata_field_spec * list) {
 
     cellparticles->next = NULL;
 }
-
-psdata_field_spec * get_field_spec_by_name(psdata_field_spec * list, const char * name) {
-    psdata_field_spec * field_cursor = list;
-
-    while (field_cursor != NULL) {
-        if (strcmp(field_cursor->name, name) == 0) {
-            return field_cursor;
-        }
-
-        field_cursor = field_cursor->next;
-    }
-
-    return NULL;
-}
-
-unsigned int get_value(psdata_field_spec * list, const char * name) // Only for dimensions really
-{
-    psdata_field_spec * field_spec = get_field_spec_by_name(list, name);
-
-    if (field_spec != NULL) {
-        return *((unsigned int *)field_spec->data);
-    }
-
-    return UINT_MAX;
-}
-
-psdata_field_spec * create_psdata_field_spec(char * line, psdata_field_spec * previous, psdata_field_spec * list) {
+static psdata_field_spec * create_psdata_field_spec(char * line, psdata_field_spec * previous, psdata_field_spec * list) {
 #define DIMENSIONS_PAD_LENGTH 5
 #define TYPE_PAD_LENGTH 64
 #define DATA_PAD_LENGTH 256
@@ -214,8 +179,6 @@ psdata_field_spec * create_psdata_field_spec(char * line, psdata_field_spec * pr
 
     char type_pad[TYPE_PAD_LENGTH];
     type_pad[0] = '\0';
-
-    size_t type_size = 0;
 
     char data_pad[DATA_PAD_LENGTH];
     char * data_ptr = data_pad;
@@ -333,8 +296,7 @@ psdata_field_spec * create_psdata_field_spec(char * line, psdata_field_spec * pr
 #undef TYPE_PAD_LENGTH
 #undef DATA_PAD_LENGTH
 }
-
-void populate_psdata(psdata * data, psdata_field_spec * list) {
+static void populate_psdata(psdata * data, psdata_field_spec * list) {
     psdata_field_spec * field_cursor = list;
 
     unsigned int num_fields = 0;
@@ -373,7 +335,7 @@ void populate_psdata(psdata * data, psdata_field_spec * list) {
 
         unsigned int this_data_size = data->entry_sizes[f];
 
-        int d;
+        unsigned int d;
         for (d = 0; d < field_cursor->num_dimensions; ++d) this_data_size *= field_cursor->dimensions[d];
 
         data->data_sizes[f] = this_data_size;
@@ -430,11 +392,8 @@ void populate_psdata(psdata * data, psdata_field_spec * list) {
 
         sprintf(host_name, "%s%s", field_cursor->name, mex_suffix);
 
-        assert(0);
         mxArray * data_mex;
 
-
-        note(2, "hokay we try\n");
         if (strcmp(field_cursor->type, "double") == 0) {
 
             data_mex = mxCreateNumericArray(field_cursor->num_dimensions,
@@ -469,8 +428,7 @@ void populate_psdata(psdata * data, psdata_field_spec * list) {
     sync_to_mex(data);
 #endif
 }
-
-void free_psdata_field_spec_list(psdata_field_spec * list) {
+static void free_psdata_field_spec_list(psdata_field_spec * list) {
     free(list->name);
     free(list->dimensions);
     free(list->type);
@@ -480,13 +438,126 @@ void free_psdata_field_spec_list(psdata_field_spec * list) {
 
     free(list);
 }
+static void print_field_spec_list_names(psdata_field_spec * list) {
+    size_t i = 0;
 
+    while (list != NULL) {
+        note(2, "%u: %s\n", i, list->name);
+        list = list->next;
+        ++i;
+    }
+}
+static size_t length_field_spec_list(psdata_field_spec * list) {
+    size_t length = 1;
+
+    while (list->next != NULL) {
+        ++length;
+
+        list = list->next;
+    }
+
+    return length;
+}
+// Guarantees to link up all the entries in the given list so they can be freed with
+// the new root node. Sorting before creating the single large array prevents alignment issues
+static psdata_field_spec * sort_field_spec_list_by_type_size_descending(psdata_field_spec * list) {
+    if (list == NULL) return NULL;
+
+    size_t list_length = length_field_spec_list(list);
+    psdata_field_spec ** entry_array = malloc(list_length * sizeof(psdata_field_spec*));
+    char * used = calloc(list_length, sizeof(char));
+
+    const char * type_order[] = {
+        "double", "unsigned int"
+    };
+
+    size_t num_types = sizeof type_order / sizeof(char*);
+
+    size_t type_number = 0;
+
+    psdata_field_spec * list_ptr = list;
+    size_t field_pos = 0;
+
+    for (size_t i = 0; i < list_length; ++i) {
+        // Scroll through non-matching types
+        while ((type_number < num_types && strcmp(list_ptr->type, type_order[type_number]) != 0) ||
+               // or if we ran out of types, through anything we already used - this'll cause 
+               // problems later but I guess it's not our concern here
+               used[field_pos]) {
+            if (list_ptr->next == NULL) {
+                ++type_number;
+                list_ptr = list;
+                field_pos = 0;
+            } else {
+                list_ptr = list_ptr->next;
+                ++field_pos;
+            }
+        }
+
+        entry_array[i] = list_ptr;
+        used[field_pos] = 1;
+
+        if (list_ptr->next) {
+            list_ptr = list_ptr->next;
+            ++field_pos;
+        } else if (type_number >= num_types) {
+            ASSERT(i == list_length - 1);
+        }
+    }
+
+    for (size_t i = 0; i < list_length-1; ++i) {
+        entry_array[i]->next = entry_array[i+1];
+    }
+
+    entry_array[list_length-1]->next = NULL;
+
+    psdata_field_spec * reordered = entry_array[0];
+
+    free(entry_array);
+    free(used);
+
+    return reordered;
+}
+
+void build_psdata_from_string(psdata * data, const char * string) {
+    char * string_copy = malloc((strlen(string)+1) * sizeof(char));
+    strcpy(string_copy, string);
+
+    char * endstring = string_copy + strlen(string_copy);
+    char * endline = string_copy - 1;
+
+    psdata_field_spec * first = NULL;
+    psdata_field_spec * current = NULL;
+
+    while (endline < endstring) {
+        char * line = strtok(endline + 1, "\n");
+        if (line == NULL) break;
+
+        endline = line + strlen(line);
+
+        if (endline > line && line[0] == '#') continue;
+
+        current = create_psdata_field_spec(line, current, first);
+
+        if (first == NULL) first = current;
+    }
+
+    free(string_copy);
+
+    add_grid_arrays(first);
+
+    psdata_field_spec * reordered = sort_field_spec_list_by_type_size_descending(first);
+
+    populate_psdata(data, reordered);
+
+    free_psdata_field_spec_list(reordered);
+}
 void build_psdata(psdata * data, const char * path) {
     FILE * conf = fopen(path, "rb");
 
     if (conf == NULL) {
         note(1, "Could not read file %s\n", path);
-        return;
+        ASSERT(0);
     }
 
     fseek(conf, 0, SEEK_END);
@@ -501,4 +572,6 @@ void build_psdata(psdata * data, const char * path) {
     contents[conf_end-1] = '\0';
 
     build_psdata_from_string(data, contents);
+
+    free(contents);
 }
