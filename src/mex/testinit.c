@@ -63,5 +63,5 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
     call_for_all_particles_device_opencl(pso, "compute_original_density");
 
     /* Return the particles to the host so we can call kernels with the right amount */
-    sync_psdata_device_to_host(data, pso);
+    sync_psdata_device_to_host(*data, pso);
 }

@@ -44,7 +44,7 @@ typedef struct {
 } psdata;
 
 #ifdef MATLAB_MEX_FILE
-psdata * create_stored_psdata_from_conf(const char * path);
+psdata * create_stored_psdata_from_string(const char * string);
 psdata * get_stored_psdata();
 void free_stored_psdata();
 #endif
@@ -57,9 +57,9 @@ void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, d
 int get_field_psdata( psdata data, const char * name );
 void set_field_psdata( psdata * data, const char * name, void * field, unsigned int size, unsigned int offset );
 
-unsigned int psdata_names_size( psdata * data );
-unsigned int psdata_dimensions_size( psdata * data );
-unsigned int psdata_data_size( psdata * data );
+unsigned int psdata_names_size( psdata data );
+unsigned int psdata_dimensions_size( psdata data );
+unsigned int psdata_data_size( psdata data );
 
 int create_host_field_psdata( psdata * data, const char * name, void * field, unsigned int size );
 int get_host_field_psdata( psdata * data, const char * name );

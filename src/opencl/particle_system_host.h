@@ -57,8 +57,9 @@ void set_kernel_args_to_pso(psdata_opencl pso, cl_kernel kernel);
 void free_psdata_opencl(psdata_opencl * pso);
 void terminate_opencl();
 
-void sync_psdata_device_to_host(psdata * data, psdata_opencl pso);
-void sync_psdata_host_to_device(psdata * data, psdata_opencl pso, int full);
+void sync_psdata_device_to_host(psdata data, psdata_opencl pso);
+void sync_psdata_fields_device_to_host(psdata data, psdata_opencl pso, size_t num_fields, const char * const * const field_names);
+void sync_psdata_host_to_device(psdata data, psdata_opencl pso, int full);
 
 void populate_position_cuboid_device_opencl(psdata_opencl pso,
                                             double x1, double y1, double z1,

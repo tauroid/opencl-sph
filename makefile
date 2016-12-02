@@ -59,8 +59,8 @@ bin/mex/%.mexa64: build/mex/%.o bin/mex/libsph_mex.so
 	@echo "$$(tput bold)$$(tput setaf 2)Built MEX file $@$$(tput sgr0)"
 
 build/mex/%.o: src/mex/%.c
-	mex -O CFLAGS="$$CFLAGS -fPIC -std=c99" -c $< -outdir build/mex
+	$(MATLAB_DIST_PATH)/bin/mex -O CFLAGS="$$CFLAGS -fPIC -std=c99" -c $< -outdir build/mex
 
 build/mex/%_mex.o: src/%.c
-	mex -O CFLAGS="$$CFLAGS -fPIC -std=c99" -c $< -outdir build/mex/$(*D)
+	$(MATLAB_DIST_PATH)/bin/mex -O CFLAGS="$$CFLAGS -fPIC -std=c99" -c $< -outdir build/mex/$(*D)
 	mv build/mex/$*.o $@

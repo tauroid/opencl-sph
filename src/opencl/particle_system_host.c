@@ -553,11 +553,11 @@ psdata_opencl create_psdata_opencl(psdata * data, const char * file_list)
     unsigned int fmsize = nf*sizeof(unsigned int);
 
     pso.num_fields = nf;
-    pso.names = clCreateBuffer(_context, flags, psdata_names_size(data), (char*) data->names, &error);
+    pso.names = clCreateBuffer(_context, flags, psdata_names_size(*data), (char*) data->names, &error);
     HANDLE_CL_ERROR(error);
     pso.names_offsets = clCreateBuffer(_context, flags, fmsize, data->names_offsets, &error);
     HANDLE_CL_ERROR(error);
-    pso.dimensions = clCreateBuffer(_context, flags, psdata_dimensions_size(data), data->dimensions, &error);
+    pso.dimensions = clCreateBuffer(_context, flags, psdata_dimensions_size(*data), data->dimensions, &error);
     HANDLE_CL_ERROR(error);
     pso.num_dimensions = clCreateBuffer(_context, flags, fmsize, data->num_dimensions, &error);
     HANDLE_CL_ERROR(error);
@@ -565,7 +565,7 @@ psdata_opencl create_psdata_opencl(psdata * data, const char * file_list)
     HANDLE_CL_ERROR(error);
     pso.entry_sizes = clCreateBuffer(_context, flags, fmsize, data->entry_sizes, &error);
     HANDLE_CL_ERROR(error);
-    pso.data = clCreateBuffer(_context, flags, psdata_data_size(data), data->data, &error);
+    pso.data = clCreateBuffer(_context, flags, psdata_data_size(*data), data->data, &error);
     HANDLE_CL_ERROR(error);
     pso.data_sizes = clCreateBuffer(_context, flags, fmsize, data->data_sizes, &error);
     HANDLE_CL_ERROR(error);
@@ -693,32 +693,32 @@ void free_psdata_opencl(psdata_opencl * pso)
  * @param data Host buffer
  * @param pso Device buffer list
  */
-void sync_psdata_host_to_device(psdata * data, psdata_opencl pso, int full)
+void sync_psdata_host_to_device(psdata data, psdata_opencl pso, int full)
 {
-    unsigned int nf = data->num_fields;
+    unsigned int nf = data.num_fields;
 
     unsigned int fmsize = nf*sizeof(unsigned int);
 
     HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.data, CL_FALSE, 0,
-                                         psdata_data_size(data), data->data, 0, NULL, NULL));
+                                         psdata_data_size(data), data.data, 0, NULL, NULL));
 
     if (full) {
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.names, CL_FALSE, 0,
-                                             psdata_names_size(data), (char*) data->names, 0, NULL, NULL));
+                                             psdata_names_size(data), (char*) data.names, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.names_offsets, CL_FALSE, 0,
-                                             fmsize, data->names_offsets, 0, NULL, NULL));
+                                             fmsize, data.names_offsets, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.dimensions, CL_FALSE, 0, 
-                                             psdata_dimensions_size(data), data->dimensions, 0, NULL, NULL));
+                                             psdata_dimensions_size(data), data.dimensions, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.num_dimensions, CL_FALSE, 0, 
-                                             fmsize, data->num_dimensions, 0, NULL, NULL));
+                                             fmsize, data.num_dimensions, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.dimensions_offsets, CL_FALSE, 0,
-                                             fmsize, data->dimensions_offsets, 0, NULL, NULL));
+                                             fmsize, data.dimensions_offsets, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.entry_sizes, CL_FALSE, 0,
-                                             fmsize, data->entry_sizes, 0, NULL, NULL));
+                                             fmsize, data.entry_sizes, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.data_sizes, CL_FALSE, 0,
-                                             fmsize, data->data_sizes, 0, NULL, NULL));
+                                             fmsize, data.data_sizes, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.data_offsets, CL_FALSE, 0,
-                                             fmsize, data->data_offsets, 0, NULL, NULL));
+                                             fmsize, data.data_offsets, 0, NULL, NULL));
     }
 
     HANDLE_CL_ERROR(clFinish(_command_queues[0]));
@@ -730,12 +730,26 @@ void sync_psdata_host_to_device(psdata * data, psdata_opencl pso, int full)
  * @param data Host buffer
  * @param pso Device buffer list
  */
-void sync_psdata_device_to_host(psdata * data, psdata_opencl pso)
+void sync_psdata_device_to_host(psdata data, psdata_opencl pso)
 {
-    HANDLE_CL_ERROR(clEnqueueReadBuffer(_command_queues[0], pso.data, CL_FALSE, 0,
-                                         psdata_data_size(data), data->data, 0, NULL, NULL));
+    HANDLE_CL_ERROR(clEnqueueReadBuffer(_command_queues[0], pso.data, CL_TRUE, 0,
+                                         psdata_data_size(data), data.data, 0, NULL, NULL));
+}
 
-    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
+// One by one naively
+void sync_psdata_fields_device_to_host(psdata data, psdata_opencl pso, size_t num_fields, const char * const * const field_names)
+{
+    for (size_t i = 0; i < num_fields; ++i) {
+        int f = get_field_psdata(data, field_names[i]);
+
+        if (f == -1) {
+            note(1, "Field %s not found.\n", field_names[i]);
+            continue;
+        }
+
+        HANDLE_CL_ERROR(clEnqueueReadBuffer(_command_queues[0], pso.data, CL_TRUE, data.data_offsets[f],
+                                            data.data_sizes[f], (char*) data.data + data.data_offsets[f], 0, NULL, NULL));
+    }
 }
 
 /**

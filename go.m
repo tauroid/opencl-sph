@@ -4,7 +4,7 @@ num_steps = 2000;
 
 testinit_wrap();
 
-[position, density, n] = querystate('position_mex', 'density_mex', 'n_mex');
+[position, density, n] = querystate('position', 'density', 'n');
 
 figure;
 for i = 1:num_steps
@@ -12,7 +12,7 @@ for i = 1:num_steps
     axis([-2 2 -2 2 -2 2]);
 
     simstep();
-    [position, density] = querystate('position_mex', 'density_mex');
+    [position, density] = querystate('position', 'density');
     
     drawnow;
 end

@@ -313,19 +313,19 @@ void set_field_psdata(psdata * data, const char * name, void * field, unsigned i
     if (i != -1) memcpy(data->data + data->data_offsets[i] + offset, field, size);
 }
 
-unsigned int psdata_names_size(psdata * data) {
-    char * name = (char*) data->names + data->names_offsets[data->num_fields-1];
-    return (data->names_offsets[data->num_fields-1]
+unsigned int psdata_names_size(psdata data) {
+    char * name = (char*) data.names + data.names_offsets[data.num_fields-1];
+    return (data.names_offsets[data.num_fields-1]
           + strlen(name) + 1) * sizeof(char);
 }
 
-unsigned int psdata_dimensions_size(psdata * data) {
-    unsigned int nf = data->num_fields;
-    return (data->dimensions_offsets[nf-1] + data->num_dimensions[nf-1]) * sizeof(unsigned int);
+unsigned int psdata_dimensions_size(psdata data) {
+    unsigned int nf = data.num_fields;
+    return (data.dimensions_offsets[nf-1] + data.num_dimensions[nf-1]) * sizeof(unsigned int);
 }
 
-unsigned int psdata_data_size(psdata * data) {
-    return data->data_offsets[data->num_fields-1] + data->data_sizes[data->num_fields-1];
+unsigned int psdata_data_size(psdata data) {
+    return data.data_offsets[data.num_fields-1] + data.data_sizes[data.num_fields-1];
 }
 
 /* Data needs to be heap allocated but it should be anyway, right? RIGHT? */

@@ -52,5 +52,5 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
     populate_position_cuboid_device_opencl(pso, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 8, 8, 8);
 
     /* Return the particles to the host so we can call kernels with the right amount */
-    sync_psdata_device_to_host(data, pso);
+    sync_psdata_device_to_host(*data, pso);
 }

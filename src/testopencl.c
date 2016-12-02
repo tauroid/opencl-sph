@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 
             call_for_all_particles_device_opencl(pso, "step_forward");
         
-            sync_psdata_device_to_host(&data, pso);
+            sync_psdata_device_to_host(data, pso);
         free_psdata_opencl(&pso);
     terminate_opencl();
 
