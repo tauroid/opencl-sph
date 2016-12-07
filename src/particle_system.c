@@ -426,6 +426,17 @@ int is_mex_field(const char * name) {
     
     return 0;
 }
+
+void get_mex_field_name(const char * name, size_t * pReturnLength, char * mex_name) {
+    const char * mext = "_mex";
+
+    if (pReturnLength != NULL) {
+        *pReturnLength = strlen(name) + strlen(mext);
+        return;
+    } else {
+        sprintf(mex_name, "%s%s", name, mext);
+    }
+}
 #endif
 
 void free_psdata( psdata * data ) {

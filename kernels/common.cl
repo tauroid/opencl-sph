@@ -34,6 +34,14 @@
 #define S_20 S_02
 #define S_21 S_12
 
+#define APPLY_CUBE_BOUNDS(position, force, minimum, maximum) \
+    if (position.x < minimum+0.2) force.x += 1/(-(minimum)+position.x) - 5;\
+    else if (position.x > maximum-0.2) force.x -= 1/(maximum-position.x) - 5;\
+    if (position.y < minimum+0.2) force.y += 1/(-(minimum)+position.y) - 5;\
+    else if (position.y > maximum-0.2) force.y -= 1/(maximum-position.y) - 5;\
+    if (position.z < minimum+0.2) force.z += 1/(-(minimum)+position.z) - 5;\
+    else if (position.z > maximum-0.2) force.z -= 1/(maximum-position.z) - 5;
+
 // Can't use function pointers so silly macro hacks it is
 // Needs gridres, gridcell, gridcount, celloffset, cellparticles from outer scope
 // Whatever m_particlenum is changed to should already be defined, otherwise how do
@@ -84,16 +92,16 @@ inline double applyLapKernel (double dist, double smoothingradius) {
 ////////// Matrix functions //////////
 // Many are for solids only but what harm does it do leaving them here
 
+constant uint givens_i_xx_values[] = { 0, 0, 1 };
+constant uint givens_i_yy_values[] = { 1, 2, 2 };
+constant uint givens_i_ee_values[] = { 2, 1, 0 };
+constant uint givens_i_ex_values[] = { 4, 3, 3 };
+constant uint givens_i_ey_values[] = { 5, 5, 4 };
+
 static inline void givensRotateToZero (double i[6], double pin[9], uint offdiag, double o[6], double pout[9]) {
     /* [ 0  3  4
          .  1  5
          .  .  2 ] */
-
-    constant uint i_xx_values[] = { 0, 0, 1 };
-    constant uint i_yy_values[] = { 1, 2, 2 };
-    constant uint i_ee_values[] = { 2, 1, 0 };
-    constant uint i_ex_values[] = { 4, 3, 3 };
-    constant uint i_ey_values[] = { 5, 5, 4 };
 
     const uint ix = offdiag - 3;
 
@@ -106,12 +114,12 @@ static inline void givensRotateToZero (double i[6], double pin[9], uint offdiag,
     const uint i_ey = 2+i_ee+i_yy;
 */
 
-    const uint i_xx = i_xx_values[ix];
-    const uint i_yy = i_yy_values[ix];
-    const uint i_ee = i_ee_values[ix];
+    const uint i_xx = givens_i_xx_values[ix];
+    const uint i_yy = givens_i_yy_values[ix];
+    const uint i_ee = givens_i_ee_values[ix];
     const uint i_xy = offdiag;
-    const uint i_ex = i_ex_values[ix];
-    const uint i_ey = i_ey_values[ix];
+    const uint i_ex = givens_i_ex_values[ix];
+    const uint i_ey = givens_i_ey_values[ix];
 
     const double angle = 0.5*atan(2*i[i_xy]/(i[i_xx]-i[i_yy]));
 

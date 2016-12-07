@@ -7,7 +7,7 @@ all: buildfolders native mex
 
 native: bin/testopencl LibSPH
 
-mex: bin/mex/testinit.mexa64 bin/mex/querystate.mexa64 bin/mex/simstep.mexa64 LibSPH_mex bin/mex/testinit_wrap.m bin/mex/testinit_fluid.mexa64 bin/mex/simstep_fluid.mexa64 bin/mex/testinit_fluid_wrap.m
+mex: bin/mex/init.mexa64 bin/mex/callkernel.mexa64 bin/mex/computebins.mexa64 bin/mex/syncalldevicetohost.mexa64 bin/mex/syncallhosttodevice.mexa64 bin/mex/testinit.mexa64 bin/mex/querystate.mexa64 bin/mex/simstep.mexa64 bin/mex/setstate.mexa64 LibSPH_mex bin/mex/init_wrap.m bin/mex/testinit_wrap.m bin/mex/testinit_fluid.mexa64 bin/mex/simstep_fluid.mexa64 bin/mex/testinit_fluid_wrap.m
 
 bin/test_conf_reorder: build/test_conf_reorder.o bin/libsph.so
 	$(CC) -Wl,-rpath,'$$ORIGIN' -fPIC $< -o $@ -lsph -Lbin -lm
@@ -39,10 +39,7 @@ bin/libsph.so: build/particle_system.o build/opencl/particle_system_host.o build
 build/%.o: src/%.c
 	$(CC) -fPIC -c $< -o $@
 
-bin/mex/testinit_wrap.m: src/mex/testinit_wrap.m
-	cp $< $@
-
-bin/mex/testinit_fluid_wrap.m: src/mex/testinit_fluid_wrap.m
+bin/mex/%.m: src/mex/%.m
 	cp $< $@
 
 LibSPH_mex: bin/mex/libsph_mex.so

@@ -152,6 +152,7 @@ kernel void compute_stresses (PSO_ARGS) {
 
     computeStress(strain + i*6, bulk_modulus, shear_modulus, stress + i*6);
 }
+   
 kernel void compute_forces_solids (PSO_ARGS) {
     USE_GRID_PROPS
 
@@ -166,51 +167,55 @@ kernel void compute_forces_solids (PSO_ARGS) {
 
     if (i >= n) return;
 
-    double3 ipos0 = vload3(i, originalpos);
     double3 ipos = vload3(i, position);
     double3 ivel = vload3(i, velocity);
 
-    global double * i_stress = stress + i*6;
-    global double * i_rotation = rotation + i*3*3;
-
-    double3 f_e = (double3)(0, 0, 0);
+// Repurpose for later batches
+#define INIT_SOLIDS_FORCE_COMPUTATION \
+    double3 ipos0 = vload3(i, originalpos);\
+\
+    global double * i_stress = stress + i*6;\
+    global double * i_rotation = rotation + i*3*3;\
+\
+    double3 f_e = (double3)(0, 0, 0);\
     double3 f_v = (double3)(0, 0, 0);
+
+    INIT_SOLIDS_FORCE_COMPUTATION
 
     FOR_PARTICLES_IN_RANGE(i, j,
         if (j == i) continue;
 
-        // Elasticity
-        double3 jpos0 = vload3(j, originalpos);
-
-        global double * j_stress = stress + j*6;
-
-        double3 x = jpos0 - ipos0;
-        double vivj = mass*mass/density0[i]/density0[j];
-        double3 f_ji = -vivj * multiplySymMatrixVector(i_stress, applyKernelGradient(x, smoothingradius));
-        double3 f_ij = -vivj * multiplySymMatrixVector(j_stress, applyKernelGradient(-x, smoothingradius));
-
-        global double * j_rotation = rotation + j*3*3;
-
-        f_e += -multiplyMatrixVector(i_rotation, f_ji) + multiplyMatrixVector(j_rotation, f_ij);
-
-        // Viscosity
-        double3 jpos = vload3(j, position);
-        double3 jvel = vload3(j, velocity);
-
+#define SOLIDS_FORCE_COMPUTATION \
+        double3 jpos0 = vload3(j, originalpos);\
+\
+        global double * j_stress = stress + j*6;\
+\
+        double3 x = jpos0 - ipos0;\
+        double vivj = mass*mass/density0[i]/density0[j];\
+        double3 f_ji = -vivj * multiplySymMatrixVector(i_stress, applyKernelGradient(x, smoothingradius));\
+        double3 f_ij = -vivj * multiplySymMatrixVector(j_stress, applyKernelGradient(-x, smoothingradius));\
+\
+        global double * j_rotation = rotation + j*3*3;\
+\
+        f_e += -multiplyMatrixVector(i_rotation, f_ji) + multiplyMatrixVector(j_rotation, f_ij);\
+\
+        double3 jpos = vload3(j, position);\
+        double3 jvel = vload3(j, velocity);\
+\
         f_v += mass/density[j] * (jvel - ivel) * applyLapKernel(length(jpos - ipos), smoothingradius);
+
+        SOLIDS_FORCE_COMPUTATION
     )
 
-    f_e *= 0.5;
+#define FINALISE_SOLIDS_FORCE_COMPUTATION \
+    f_e *= 0.5;\
     f_v *= viscosity;
+
+    FINALISE_SOLIDS_FORCE_COMPUTATION
 
     double3 f = f_e + f_v;
 
-    if (ipos.x < -1.8) f.x += 1/(2.0+ipos.x) - 5;
-    else if (ipos.x > 1.8) f.x -= 1/(2.0-ipos.x) - 5;
-    if (ipos.y < -1.8) f.y += 1/(2.0+ipos.y) - 5;
-    else if (ipos.y > 1.8) f.y -= 1/(2.0-ipos.y) - 5;
-    if (ipos.z < -1.8) f.z += 1/(2.0+ipos.z) - 5;
-    else if (ipos.z > 1.8) f.z -= 1/(2.0-ipos.z) - 5;
+    APPLY_CUBE_BOUNDS(ipos, f, -2.0, 2.0)
 
     vstore3(f, i, force);
 }

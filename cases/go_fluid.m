@@ -9,7 +9,7 @@ testinit_fluid_wrap();
 figure;
 for i = 1:num_steps
     scatter3(position(1,1:n), position(2,1:n), position(3,1:n), 10, density(1:n));
-    axis([-1.5 1.5 -1.5 1.5 -1.5 1.5]);
+    axis([-2.0 2.0 -2.0 2.0 -2.0 2.0]);
 
     simstep_fluid();
     [position, density] = querystate('position', 'density');

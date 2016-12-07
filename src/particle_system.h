@@ -67,6 +67,7 @@ int get_host_field_psdata( psdata * data, const char * name );
 #ifdef MATLAB_MEX_FILE
 void sync_to_mex( psdata * data );
 int is_mex_field( const char * name );
+void get_mex_field_name(const char * name, /* Output */ size_t * pReturnLength, char * mex_name);
 #endif
 
 void free_psdata( psdata * data );

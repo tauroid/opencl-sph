@@ -14,28 +14,25 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
     if (data == NULL || pso == NULL) mexErrMsgIdAndTxt("QueryState:InitError", "Module not initialised");
     if (nlhs < nrhs && nlhs > 1) mexErrMsgIdAndTxt("QueryState:ArgError", "Not enough return arguments");
 
-    char ** strarg = calloc(nrhs, sizeof(char*));
-    char ** strarg_mex = calloc(nrhs, sizeof(char*));
+    char ** strarg = mxCalloc(nrhs, sizeof(char*));
+    char ** strarg_mex = mxCalloc(nrhs, sizeof(char*));
 
-    const char * mext = "_mex";
-    size_t mext_len = strlen(mext) * sizeof(char);
-
-    int i = 0;
-    for (; i < nrhs; ++i) {
+    for (int i = 0; i < nrhs; ++i) {
         if (mxIsChar(prhs[i])) {
             size_t buflen = mxGetN(prhs[i])*sizeof(mxChar) + 1;
             strarg[i] = mxMalloc(buflen);
             mxGetString(prhs[i], strarg[i], buflen);
 
-            strarg_mex[i] = malloc(buflen+mext_len);
-            sprintf(strarg_mex[i], "%s%s", strarg[i], mext);
+            size_t mexbuf_len;
+            get_mex_field_name(strarg[i], &mexbuf_len, NULL);
 
-            for (size_t j = 0; j < data->num_host_fields; ++j) {
-                if (strcmp(data->host_names[j], strarg_mex[i]) == 0) {
-                    plhs[i] = data->host_data[j];
-                    break;
-                }
-            }
+            strarg_mex[i] = mxMalloc((mexbuf_len+1)*sizeof(char));
+            get_mex_field_name(strarg[i], NULL, strarg_mex[i]);
+
+            int j = get_host_field_psdata(data, strarg_mex[i]);
+
+            if (j >= 0) plhs[i] = data->host_data[j];
+            else note(2, "%s not found - skipped\n", strarg[i]);
         } else {
             mexErrMsgIdAndTxt("QueryState:ArgError", "Argument %d is not a string", i);
         }
@@ -45,15 +42,16 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
 
     sync_to_mex(data);
     
-    for (; i < nrhs; ++i) {
+    for (int i = 0; i < nrhs; ++i) {
         if (strarg[i] != NULL) {
             mxFree(strarg[i]);
         }
 
         if (strarg_mex[i] != NULL) {
-            free(strarg_mex[i]);
+            mxFree(strarg_mex[i]);
         }
     }
 
-    free(strarg);
+    mxFree(strarg);
+    mxFree(strarg_mex);
 }

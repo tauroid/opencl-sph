@@ -47,6 +47,7 @@ typedef struct {
 
 #ifdef MATLAB_MEX_FILE
 psdata_opencl * get_stored_psdata_opencl();
+void free_stored_psdata_opencl();
 void opencl_use_buflist(psdata_opencl pso);
 #endif
 
@@ -60,6 +61,7 @@ void terminate_opencl();
 void sync_psdata_device_to_host(psdata data, psdata_opencl pso);
 void sync_psdata_fields_device_to_host(psdata data, psdata_opencl pso, size_t num_fields, const char * const * const field_names);
 void sync_psdata_host_to_device(psdata data, psdata_opencl pso, int full);
+void sync_psdata_fields_host_to_device(psdata data, psdata_opencl pso, size_t num_fields, const char * const * const field_names);
 
 void populate_position_cuboid_device_opencl(psdata_opencl pso,
                                             double x1, double y1, double z1,

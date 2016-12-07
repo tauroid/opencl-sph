@@ -34,6 +34,12 @@ psdata_opencl * get_stored_psdata_opencl()
 {
     return &_pso;
 }
+
+void free_stored_psdata_opencl() {
+    free_psdata_opencl(&_pso);
+
+    memset(&_pso, 0, sizeof _pso);
+}
 #endif
 
 /**
@@ -724,6 +730,26 @@ void sync_psdata_host_to_device(psdata data, psdata_opencl pso, int full)
     HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
+// Don't write to the same field twice or there will be a data race
+void sync_psdata_fields_host_to_device(psdata data, psdata_opencl pso, size_t num_fields, const char * const * const field_names)
+{
+    for (size_t i = 0; i < num_fields; ++i) {
+        if (field_names[i] == NULL) continue;
+
+        int f = get_field_psdata(data, field_names[i]);
+
+        if (f == -1) {
+            note(1, "Field %s not found.\n", field_names[i]);
+            continue;
+        }
+
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.data, CL_FALSE, data.data_offsets[f],
+                                             data.data_sizes[f], (char*) data.data + data.data_offsets[f], 0, NULL, NULL));
+    }
+
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
+}
+
 /**
  * Copy buffer data from host to device
  *
@@ -736,7 +762,6 @@ void sync_psdata_device_to_host(psdata data, psdata_opencl pso)
                                          psdata_data_size(data), data.data, 0, NULL, NULL));
 }
 
-// One by one naively
 void sync_psdata_fields_device_to_host(psdata data, psdata_opencl pso, size_t num_fields, const char * const * const field_names)
 {
     for (size_t i = 0; i < num_fields; ++i) {
@@ -747,9 +772,11 @@ void sync_psdata_fields_device_to_host(psdata data, psdata_opencl pso, size_t nu
             continue;
         }
 
-        HANDLE_CL_ERROR(clEnqueueReadBuffer(_command_queues[0], pso.data, CL_TRUE, data.data_offsets[f],
+        HANDLE_CL_ERROR(clEnqueueReadBuffer(_command_queues[0], pso.data, CL_FALSE, data.data_offsets[f],
                                             data.data_sizes[f], (char*) data.data + data.data_offsets[f], 0, NULL, NULL));
     }
+    
+    HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
 /**
