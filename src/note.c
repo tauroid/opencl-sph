@@ -19,17 +19,15 @@ void note(unsigned int level, const char * fmt, ...) {
     vprintf(fmt, args);
     va_end(args);
 #else
-    char * buffer;
-    size_t size;
-    FILE * stream = open_memstream(&buffer, &size);
+#define MAX_ERROR_LENGTH 256
+    char buffer[MAX_ERROR_LENGTH];
 
     va_list args;
     va_start(args, fmt);
-    vfprintf(stream, fmt, args);
+    vsnprintf(buffer, MAX_ERROR_LENGTH, fmt, args);
     va_end(args);
 
-    fclose(stream);
     mexPrintf("%s", buffer);
-    free(buffer);
+    mexEvalString("drawnow;");
 #endif
 }

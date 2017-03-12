@@ -5,11 +5,6 @@
 
 #include "platforminfo.h"
 #include "../note.h"
-#ifdef MATLAB_MEX_FILE
-#include "mex.h"
-#define malloc mxMalloc
-#define free mxFree
-#endif
 
 static Platform const * _platforms = NULL; /* Const as fields should not change value after init */
 static unsigned int     _nplatforms = 0;
@@ -27,6 +22,8 @@ void get_opencl_platform_info(Platform const ** const pptr, unsigned int * const
     if (_platforms != NULL) {
         *pptr = _platforms;
         *npptr = _nplatforms;
+
+        return;
     }
 
     cl_platform_id * platform_ids;
@@ -130,6 +127,23 @@ void get_opencl_platform_info(Platform const ** const pptr, unsigned int * const
                 (device->id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t),
                  &device->max_workgroup_size, NULL);
             note(1, " > Max work-group size: %zu\n", device->max_workgroup_size);
+
+            clGetDeviceInfo
+                (device->id, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, sizeof(cl_uint),
+                 &device->max_work_item_dimensions, NULL);
+            note(1, " > Max work item dimensions: %u\n", device->max_work_item_dimensions);
+            device->max_work_item_sizes = malloc(device->max_work_item_dimensions*sizeof(size_t));
+            clGetDeviceInfo
+                (device->id, CL_DEVICE_MAX_WORK_ITEM_SIZES,
+                 device->max_work_item_dimensions*sizeof(size_t),
+                 device->max_work_item_sizes, NULL);
+            note(1, " > Max work item sizes:");
+            int i;
+            for (i = 0; i < device->max_work_item_dimensions-1; ++i) {
+                note(1, " %zu,", device->max_work_item_sizes[i]);
+            }
+            note(1, " %zu\n", device->max_work_item_sizes[i]);
+
             if (device->double_supported)
                 clGetDeviceInfo
                     (device->id, CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE, sizeof(cl_uint),
@@ -139,6 +153,7 @@ void get_opencl_platform_info(Platform const ** const pptr, unsigned int * const
                     (device->id, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, sizeof(cl_uint),
                      &device->pref_vector_width, NULL);
             note(1, " > Preferred vector width (floating point): %u\n", device->pref_vector_width);
+
             note(1, "\n");
         }
 
@@ -166,6 +181,7 @@ void free_opencl_platform_info() {
             free(device->driver_version);
             free(device->extensions);
             free(device->profile);
+            free(device->max_work_item_sizes);
         }
 
         free((void*)_platforms[p].devices);
