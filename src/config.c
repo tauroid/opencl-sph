@@ -40,7 +40,7 @@ void load_config(const char * relativePath) {
 #ifndef MATLAB_MEX_FILE
     free(exe_path);
 #endif
-
+printf(" ## opening file %s ", conf_path); // added to check what file is being read //
     // Copy the contents
     FILE * conf = fopen(conf_path, "rb");
 

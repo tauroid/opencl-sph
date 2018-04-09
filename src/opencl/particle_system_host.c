@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS   // needed to use clCreateCommandQueue on OpenCL-2.0
 #include <CL/opencl.h>
 
 #include "clerror.h"
@@ -52,7 +53,7 @@ void init_opencl()
     if (_ready) return;
 
     get_opencl_platform_info(&_platforms, &_num_platforms);
-
+printf("chk4.1 ");
     ASSERT(_num_platforms > 0);
 
     const cl_context_properties context_properties[] = {
@@ -60,7 +61,7 @@ void init_opencl()
     };
     
     cl_int error;
-
+printf("chk4.2 ");
     _context = clCreateContextFromType
         ( (const cl_context_properties*) context_properties,
           CL_DEVICE_TYPE_GPU, contextErrorCallback, NULL, &error );
@@ -71,13 +72,13 @@ void init_opencl()
     _num_command_queues = _platforms[0].num_devices;
 
     ASSERT(_num_command_queues > 0);
-
+printf("chk4.3 ");
     unsigned int i;
     for (i = 0; i < _num_command_queues; ++i) {
         _command_queues[i] = clCreateCommandQueue
             ( _context, _platforms[0].devices[i].id,
               CL_QUEUE_PROFILING_ENABLE, &error );
-
+printf("chk4.4 ");
         HANDLE_CL_ERROR(error);
     }
 
