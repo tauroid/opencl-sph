@@ -18,6 +18,7 @@ void printFieldOffsets(psdata data) {
 
 int main(int argc, char *argv[])
 {
+printf("chk0 ");
     set_log_level(1);
     psdata data;
 printf("chk1 ");    

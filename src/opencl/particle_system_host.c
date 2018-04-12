@@ -24,6 +24,10 @@ static unsigned int _num_command_queues = 0;
 static Platform const * _platforms;
 static unsigned int _num_platforms;
 
+// static targets to be replaced in later versions.
+static int target_platform = 1; // for Bracewell
+static int target_device = 0; // 0,1,2,3 for Bracewell
+
 #ifdef MATLAB_MEX_FILE
 static psdata_opencl _pso;
 #endif
@@ -57,26 +61,37 @@ printf("chk4.1 ");
     ASSERT(_num_platforms > 0);
 
     const cl_context_properties context_properties[] = {
-        CL_CONTEXT_PLATFORM, (cl_context_properties) _platforms[0].id, 0
+        CL_CONTEXT_PLATFORM, (cl_context_properties) _platforms[target_platform].id, 0  // replaced [0] with target_platform
     };
     
     cl_int error;
 printf("chk4.2 ");
-    _context = clCreateContextFromType
+    /*_context = clCreateContextFromType  // not working on Bracewell. Reason ?
         ( (const cl_context_properties*) context_properties,
-          CL_DEVICE_TYPE_GPU, contextErrorCallback, NULL, &error );
+          CL_DEVICE_TYPE_GPU, contextErrorCallback, NULL, &error ); */
+
+    //int plat_num=1;//plat_num 0 = Intel, 1 = Nvidia on Bracewell
+    //int dev_num=3;//0,1,2,3 work for plat_num 1, ie Nvidia on Bracewell
+    int num_devices=(int)_platforms[target_platform].num_devices;
+	const cl_device_id *devices = &_platforms[target_platform].devices[target_device].id;
+
+    _context = clCreateContext
+            ( (const cl_context_properties*) context_properties,//0,
+              1,//num_devices, it does not like when num_devices>1,
+			  devices, // const cl_device_id * devices
+			  contextErrorCallback, NULL, &error );
 
     HANDLE_CL_ERROR(error);
 
-    _command_queues     = malloc(_platforms[0].num_devices*sizeof(cl_command_queue));
-    _num_command_queues = _platforms[0].num_devices;
+    _command_queues     = malloc(_platforms[target_platform].num_devices*sizeof(cl_command_queue)); // replaced [0] with target_platform
+    _num_command_queues = _platforms[target_platform].num_devices; // replaced [0] with [target_platform]
 
     ASSERT(_num_command_queues > 0);
 printf("chk4.3 ");
     unsigned int i;
     for (i = 0; i < _num_command_queues; ++i) {
         _command_queues[i] = clCreateCommandQueue
-            ( _context, _platforms[0].devices[i].id,
+            ( _context, _platforms[target_platform].devices[target_device].id, // may need _platforms[1] for nvidia, [0]=>CPU
               CL_QUEUE_PROFILING_ENABLE, &error );
 printf("chk4.4 ");
         HANDLE_CL_ERROR(error);
@@ -251,18 +266,18 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
         free(compilation_unit_with_macros);
     }
 
-    cl_int build_error = clBuildProgram(pso->ps_prog, 1, &_platforms[0].devices[0].id, "-cl-fast-relaxed-math", NULL, NULL);
+    cl_int build_error = clBuildProgram(pso->ps_prog, 1, &_platforms[target_platform].devices[target_device].id, NULL/*"-cl-fast-relaxed-math"*/, NULL, NULL); // replaced [0] with [target_platform]..[target_device]
 
     if (build_error != CL_SUCCESS) {
         char * error_log;
         size_t log_length;
 
-        HANDLE_CL_ERROR(clGetProgramBuildInfo(pso->ps_prog, _platforms[0].devices[0].id,
+        HANDLE_CL_ERROR(clGetProgramBuildInfo(pso->ps_prog, _platforms[target_platform].devices[target_device].id,//replaced [0] with [target_platform] ...[target_device]
                                               CL_PROGRAM_BUILD_LOG, 0, NULL, &log_length));
 
         error_log = malloc(log_length*sizeof(char));
 
-        HANDLE_CL_ERROR(clGetProgramBuildInfo(pso->ps_prog, _platforms[0].devices[0].id,
+        HANDLE_CL_ERROR(clGetProgramBuildInfo(pso->ps_prog, _platforms[target_platform].devices[target_device].id,//replaced [0] with [target_platform] ...[target_device]
                                               CL_PROGRAM_BUILD_LOG, log_length, error_log, NULL));
 
         printf("%s\n", error_log);
@@ -486,7 +501,7 @@ void populate_position_cuboid_device_opencl(psdata_opencl pso,
                                             unsigned int zsize)
 {
     size_t work_group_edge = (size_t) pow
-        ((double) _platforms[0].devices[0].max_workgroup_size, 1.0/3.0);
+        ((double) _platforms[target_platform].devices[target_device].max_workgroup_size, 1.0/3.0);//replaced [0] with [target_platform] ... [target_device]
     size_t local_work_size[] = { work_group_edge, work_group_edge, work_group_edge };
     size_t global_work_size[] = { (xsize/work_group_edge + 1) * work_group_edge,
                                   (ysize/work_group_edge + 1) * work_group_edge,

@@ -1,5 +1,6 @@
 #MATLAB_DIST_PATH="/usr/local/MATLAB/R2014b"
 CC=$(shell which gcc)
+CFLAGS=-std=c99
 BIN_FILES=$(shell find bin -type f)
 BUILD_FILES=$(shell find build -type f)
 
@@ -10,7 +11,7 @@ native: bin/testopencl LibSPH
 #mex: bin/mex/init.mexa64 bin/mex/callkernel.mexa64 bin/mex/computebins.mexa64 bin/mex/syncalldevicetohost.mexa64 bin/mex/syncallhosttodevice.mexa64 bin/mex/testinit.mexa64 bin/mex/querystate.mexa64 bin/mex/simstep.mexa64 bin/mex/setstate.mexa64 LibSPH_mex bin/mex/init_wrap.m bin/mex/testinit_wrap.m bin/mex/testinit_fluid.mexa64 bin/mex/simstep_fluid.mexa64 bin/mex/testinit_fluid_wrap.m
 
 bin/test_conf_reorder: build/test_conf_reorder.o bin/libsph.so
-	$(CC) -Wl,-rpath,'$$ORIGIN' -fPIC $< -o $@ -lsph -Lbin -lm
+	$(CC) $(CFLAGS) -Wl,-rpath,'$$ORIGIN' -fPIC $< -o $@ -lsph -Lbin -lm
 
 buildfolders:
 	mkdir -p bin
@@ -38,7 +39,7 @@ bin/libsph.so: build/particle_system.o build/opencl/particle_system_host.o build
 	@echo "$$(tput bold)$$(tput setaf 2)Built $@$$(tput sgr0)"
 
 build/%.o: src/%.c
-	$(CC) -fPIC -c $< -o $@
+	$(CC) $(CFLAGS) -fPIC -c -ggdb $< -o $@
 
 #bin/mex/%.m: src/mex/%.m
 #	cp $< $@
