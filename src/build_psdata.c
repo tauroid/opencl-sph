@@ -20,7 +20,7 @@ struct psdata_field_spec
     char * name;
     unsigned int num_dimensions;
     unsigned int * dimensions;
-    char * type; // Only double and unsigned int for now
+    char * type; // Only REAL and unsigned int for now
     void * data; /* Optional */
 
     psdata_field_spec * next;
@@ -60,14 +60,14 @@ static void add_grid_arrays(psdata_field_spec * list) {
         note(1, "No value for smoothingradius\n");
         return;
     }
-    double smoothingradius = *((double*)smoothingradius_fs->data);
+    REAL smoothingradius = *((REAL*)smoothingradius_fs->data);
 
     psdata_field_spec * gridbounds_fs = get_field_spec_by_name(list, "gridbounds");
     if (gridbounds_fs->data == NULL) {
         note(1, "No value for gridbounds\n");
         return;
     }
-    double * gridbounds = gridbounds_fs->data;
+    REAL * gridbounds = gridbounds_fs->data;
 
     unsigned int pnum = get_value(list, "pnum");
     if (pnum == UINT_MAX) {
@@ -235,15 +235,15 @@ static psdata_field_spec * create_psdata_field_spec(char * line, psdata_field_sp
             }
             else if (segmentno == 3)
             {
-                if (strcmp(type_pad, "double") == 0) {
-                    double val = strtod(word, NULL);
-                    if (data_ptr + sizeof(double) - data_pad > DATA_PAD_LENGTH) {
+                if (strcmp(type_pad, "REAL") == 0) {
+                    REAL val = strtod(word, NULL);
+                    if (data_ptr + sizeof(REAL) - data_pad > DATA_PAD_LENGTH) {
                         note(1, "%s: Over maximum default value length\n", field_spec->name);
                         break;
                     }
 
-                    memcpy(data_ptr, &val, sizeof(double));
-                    data_ptr += sizeof(double);
+                    memcpy(data_ptr, &val, sizeof(REAL));
+                    data_ptr += sizeof(REAL);
                 } else if (strcmp(type_pad, "unsigned int") == 0) {
                     unsigned int val = strtol(word, NULL, 0);
                     if (data_ptr + sizeof(unsigned int) - data_pad > DATA_PAD_LENGTH) {
@@ -394,7 +394,7 @@ static void populate_psdata(psdata * data, psdata_field_spec * list) {
 
         mxArray * data_mex;
 
-        if (strcmp(field_cursor->type, "double") == 0) {
+        if (strcmp(field_cursor->type, "REAL") == 0) {
 
             data_mex = mxCreateNumericArray(field_cursor->num_dimensions,
                                             field_cursor->dimensions, mxDOUBLE_CLASS, mxREAL);
@@ -469,7 +469,7 @@ static psdata_field_spec * sort_field_spec_list_by_type_size_descending(psdata_f
     char * used = calloc(list_length, sizeof(char));
 
     const char * type_order[] = {
-        "double", "unsigned int"
+        "REAL", "unsigned int"
     };
 
     size_t num_types = sizeof type_order / sizeof(char*);

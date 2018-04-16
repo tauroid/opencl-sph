@@ -13,8 +13,8 @@ size_t sizeof_string_type(const char * type) {
         return sizeof(float);
     } else if (strcmp("unsigned int", type) == 0) {
         return sizeof(unsigned int);
-    } else if (strcmp("double", type) == 0) {
-        return sizeof(double);
+    } else if (strcmp("REAL", type) == 0) {
+        return sizeof(REAL);
     } else if (strcmp("int", type) == 0) {
         return sizeof(int);
     }

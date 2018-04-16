@@ -32,18 +32,17 @@ int main(int argc, char *argv[])
     if (verbose) printf("chk2 ");  
     build_psdata_from_string(&data, get_config_section("psdata_specification"));
     if (verbose) printf("chk3 ");  
-    double * position;
-    double * originalpos;
-    double * density0;
-
-    double * rotation;
+    REAL * position;
+    REAL * originalpos;
+    REAL * density0;
+    REAL * rotation;
     uint numSteps = 2000;
 
-    PS_GET_FIELD(data, "position", double, &position);
-    PS_GET_FIELD(data, "originalpos", double, &originalpos);
-    PS_GET_FIELD(data, "density0", double, &density0);
+    PS_GET_FIELD(data, "position", REAL, &position);
+    PS_GET_FIELD(data, "originalpos", REAL, &originalpos);
+    PS_GET_FIELD(data, "density0", REAL, &density0);
 
-    PS_GET_FIELD(data, "rotation", double, &rotation);
+    PS_GET_FIELD(data, "rotation", REAL, &rotation);
     if (verbose) printf("chk4 ");  
     init_opencl();
     if (verbose) printf("chk5 ");  

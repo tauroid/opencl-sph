@@ -41,7 +41,7 @@ void free_stored_psdata() {
 
 void display_entry(psdata data, size_t offset, size_t size) {
     if (size == 8) {
-        note(2, "%g, ", *((double*)((char*)data.data + offset)));
+        note(2, "%g, ", *((REAL*)((char*)data.data + offset)));
     } else if (size == 4) {
         note(2, "%u, ", *((unsigned int*)((char*)data.data + offset)));
     }
@@ -125,9 +125,9 @@ void write_psdata(psdata data, int number, const char* Case)
 
 }
 
-void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, double smoothingradius,
-                        double xbound1, double ybound1, double zbound1,
-                        double xbound2, double ybound2, double zbound2 )
+void init_psdata_fluid( psdata * data, int pnum, REAL mass, REAL timestep, REAL smoothingradius,
+                        REAL xbound1, REAL ybound1, REAL zbound1,
+                        REAL xbound2, REAL ybound2, REAL zbound2 )
 {
     { /* Names */
     const char * names_ref[] = {
@@ -210,21 +210,21 @@ void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, d
     unsigned int entry_sizes[] = {
         sizeof(int),
         sizeof(int),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
+        sizeof(REAL),
+        sizeof(REAL),
+        sizeof(REAL),
 
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
+        sizeof(REAL),
+        sizeof(REAL),
+        sizeof(REAL),
+        sizeof(REAL),
+        sizeof(REAL),
+        sizeof(REAL),
+        sizeof(REAL),
+        sizeof(REAL),
+        sizeof(REAL),
 
-        sizeof(double),
+        sizeof(REAL),
         sizeof(unsigned int),
         sizeof(unsigned int),
         sizeof(unsigned int),
@@ -276,11 +276,11 @@ void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, d
 
     { /* Assign some values */
     set_field_psdata(data, "pnum", &pnum, sizeof(int), 0);
-    set_field_psdata(data, "mass", &mass, sizeof(double), 0);
-    set_field_psdata(data, "timestep", &timestep, sizeof(double), 0);
-    set_field_psdata(data, "smoothingradius", &smoothingradius, sizeof(double), 0);
+    set_field_psdata(data, "mass", &mass, sizeof(REAL), 0);
+    set_field_psdata(data, "timestep", &timestep, sizeof(REAL), 0);
+    set_field_psdata(data, "smoothingradius", &smoothingradius, sizeof(REAL), 0);
 
-    double gridbounds[] = { xbound1, xbound2, ybound1, ybound2, zbound1, zbound2 };
+    REAL gridbounds[] = { xbound1, xbound2, ybound1, ybound2, zbound1, zbound2 };
     set_field_psdata(data, "gridbounds", gridbounds, sizeof(gridbounds), 0);
 
     unsigned int gridres[] = { num_gridcells_x, num_gridcells_y, num_gridcells_z };
@@ -452,8 +452,8 @@ void sync_to_mex(psdata * data) {
         memcpy(mex_field_ptr, ((char*) data->data) + data->data_offsets[f], data->data_sizes[f]);
         /* TODO: This is shit, fix it
         int j;
-        for (j = 0; j < data->data_sizes[f]/sizeof(double); ++j) {
-            double val = ((double*) (data->data + data->data_offsets[f]))[j];
+        for (j = 0; j < data->data_sizes[f]/sizeof(REAL); ++j) {
+            REAL val = ((REAL*) (data->data + data->data_offsets[f]))[j];
             mex_field_ptr[j] = val;
         }
         */
