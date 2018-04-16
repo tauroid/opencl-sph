@@ -17,7 +17,8 @@
 // #define WG_FUJ_SZ 896
 // TODO Careful, currently the conf file is ignored in deciding the size of the local worker size
 // It is set to be the last 2^k value to be smaller or equal to the WG_FUJ_SZ  
-#define WG_FUJ_SZ 256
+//#define WG_FUJ_SZ 256
+static size_t max_work_item_size;
 static int _ready = 0;
 static cl_context _context = NULL;
 static cl_command_queue * _command_queues;
@@ -89,6 +90,20 @@ printf("chk4.2 ");
     _num_command_queues = _platforms[target_platform].num_devices; // replaced [0] with [target_platform]
 
     ASSERT(_num_command_queues > 0);
+    
+    // JD added, determine max worker size during long time to avoid crashing on Intel Integrated GPU  
+
+    // TODO For now the device and platform selection is just hard coded to be zero, change that !
+
+    // Find the maximum dimensions of the work-groups
+    cl_uint num; 
+    clGetDeviceInfo(devices[0], CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, sizeof(cl_uint), &num, NULL);
+    // Get the max. dimensions of the work-groups
+    size_t dims[num];
+    clGetDeviceInfo(devices[0], CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof(dims), &dims, NULL);
+    max_work_item_size = dims[0]; // For now just take the first dimension;
+    printf("The Device specific maximum work item size is %u \n", dims[0]);
+  
 printf("chk4.3 ");
     unsigned int i;
     for (i = 0; i < _num_command_queues; ++i) {
@@ -597,20 +612,15 @@ psdata_opencl create_psdata_opencl(psdata * data, const char * file_list)
 
     /* Now calculate device specific sim variables */
 
-    unsigned int max_workgroup_size = WG_FUJ_SZ;
-
+ 
     unsigned int * gridres;
     PS_GET_FIELD(*data, "gridres", unsigned int, &gridres);
 
     pso.num_grid_cells = gridres[0]*gridres[1]*gridres[2];
 
-    size_t po2_workgroup_size = 1;
-    while (po2_workgroup_size<<1 < max_workgroup_size/* &&
-           po2_workgroup_size<<1 < pso.num_grid_cells*/) po2_workgroup_size <<= 1;
+    pso.po2_workgroup_size = max_work_item_size;
 
-    pso.po2_workgroup_size = po2_workgroup_size;
-
-    pso.num_blocks = (pso.num_grid_cells - 1) / (2*po2_workgroup_size) + 1;
+    pso.num_blocks = (pso.num_grid_cells - 1) / (2*max_work_item_size) + 1;
 
     build_program(data, &pso, file_list);
     create_kernels(&pso);
