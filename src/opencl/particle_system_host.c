@@ -190,28 +190,16 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
         char * exe_path;
 
 #ifndef MATLAB_MEX_FILE
-        int exe_path_len;
-
-        exe_path_len = wai_getExecutablePath(NULL, 0, NULL);
-        exe_path = malloc((exe_path_len+1)*sizeof(char));
-        wai_getExecutablePath(exe_path, exe_path_len, NULL);
-
-        exe_path[exe_path_len] = 0x0;
-        char * lastslash = strrchr(exe_path, '/');
-
-        if (lastslash != NULL) {
-            exe_path_len = (int)( (lastslash - exe_path) / sizeof(char) );
-            exe_path[exe_path_len] = 0x0;
-        }
+        exe_path = OPENCL_SPH_KERNELS_ROOT;
 #else
-        exe_path = getenv("EXE_PATH");
+		exe_path = getenv("EXE_PATH");
 #endif
 
         const char * file_extension = ".cl";
 #ifndef MATLAB_MEX_FILE
-        const char * kern_rel_path = "/../kernels/";
+        /* const char * kern_rel_path = OPENCL_SPH_KERNELS_ROOT; */
 #else
-        const char * kern_rel_path = "/../../kernels/";
+		const char * kern_rel_path = "/../../kernels/";
 #endif
 
         char * file_list_copy = malloc((strlen(file_list)+1)*sizeof(char));
@@ -224,13 +212,12 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
 
         while (file_name) {
             char * file_path = malloc( ( strlen(exe_path)
-                                       + strlen(kern_rel_path)
                                        + strlen(file_name)
                                        + strlen(file_extension)
                                        + 1
                                        ) * sizeof(char));
 
-            sprintf(file_path, "%s%s%s%s", exe_path, kern_rel_path, file_name, file_extension);
+            sprintf(file_path, "%s%s%s", exe_path, file_name, file_extension);
 
             note(1, "Adding OpenCL file at %s\n", file_path);
 
@@ -269,7 +256,7 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
         free(file_list_copy);
 
 #ifndef MATLAB_MEX_FILE
-        free(exe_path);
+        /* free(exe_path); */
 #endif
 
         char * compilation_unit_with_macros = add_field_macros_to_start_of_string(compilation_unit, data);
