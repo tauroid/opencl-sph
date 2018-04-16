@@ -63,7 +63,7 @@ printf("chk4.1 ");
     const cl_context_properties context_properties[] = {
         CL_CONTEXT_PLATFORM, (cl_context_properties) _platforms[target_platform].id, 0  // replaced [0] with target_platform
     };
-    
+
     cl_int error;
 printf("chk4.2 ");
     /*_context = clCreateContextFromType  // not working on Bracewell. Reason ?
@@ -212,7 +212,7 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
                                        + strlen(file_extension)
                                        + 1
                                        ) * sizeof(char));
-            
+
             sprintf(file_path, "%s%s%s%s", exe_path, kern_rel_path, file_name, file_extension);
 
             note(1, "Adding OpenCL file at %s\n", file_path);
@@ -407,7 +407,7 @@ static void insert_particles_in_bin_array_device_opencl(psdata_opencl pso)
     ASSERT(insert_particles_in_bin_array != NULL);
 
     HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], insert_particles_in_bin_array, 1, NULL, &num_work_items, &pso.po2_workgroup_size, 0, NULL, NULL));
-    
+
     HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
@@ -453,7 +453,7 @@ void compute_forces_device_opencl(psdata_opencl pso)
     cl_kernel compute_forces = get_kernel(pso, "compute_forces");
 
     ASSERT(compute_forces != NULL);
-    
+
     HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], compute_forces, 1, NULL,
                                            &num_workitems, &pso.po2_workgroup_size, 0, NULL, NULL));
 
@@ -473,7 +473,7 @@ void step_forward_device_opencl(psdata_opencl pso)
     cl_kernel step_forward = get_kernel(pso, "step_forward");
 
     ASSERT(step_forward != NULL);
-    
+
     HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], step_forward, 1, NULL,
                                            &num_workitems, &pso.po2_workgroup_size, 0, NULL, NULL));
 
@@ -729,9 +729,9 @@ void sync_psdata_host_to_device(psdata data, psdata_opencl pso, int full)
                                              psdata_names_size(data), (char*) data.names, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.names_offsets, CL_FALSE, 0,
                                              fmsize, data.names_offsets, 0, NULL, NULL));
-        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.dimensions, CL_FALSE, 0, 
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.dimensions, CL_FALSE, 0,
                                              psdata_dimensions_size(data), data.dimensions, 0, NULL, NULL));
-        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.num_dimensions, CL_FALSE, 0, 
+        HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.num_dimensions, CL_FALSE, 0,
                                              fmsize, data.num_dimensions, 0, NULL, NULL));
         HANDLE_CL_ERROR(clEnqueueWriteBuffer(_command_queues[0], pso.dimensions_offsets, CL_FALSE, 0,
                                              fmsize, data.dimensions_offsets, 0, NULL, NULL));
@@ -791,7 +791,7 @@ void sync_psdata_fields_device_to_host(psdata data, psdata_opencl pso, size_t nu
         HANDLE_CL_ERROR(clEnqueueReadBuffer(_command_queues[0], pso.data, CL_FALSE, data.data_offsets[f],
                                             data.data_sizes[f], (char*) data.data + data.data_offsets[f], 0, NULL, NULL));
     }
-    
+
     HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
