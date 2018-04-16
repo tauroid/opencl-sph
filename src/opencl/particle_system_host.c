@@ -14,8 +14,10 @@
 
 #define NUM_PS_ARGS 10
 
-#define WG_FUJ_SZ 896
-
+// #define WG_FUJ_SZ 896
+// TODO Careful, currently the conf file is ignored in deciding the size of the local worker size
+// It is set to be the last 2^k value to be smaller or equal to the WG_FUJ_SZ  
+#define WG_FUJ_SZ 256
 static int _ready = 0;
 static cl_context _context = NULL;
 static cl_command_queue * _command_queues;
