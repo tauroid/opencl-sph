@@ -159,7 +159,7 @@ void call_kernel_device_opencl(psdata_opencl pso, const char * kernel_name, cl_u
     note(1, "Calling kernel %s with work size %u and local size %u\n", kernel_name, *global_work_size, *local_work_size);
 
     HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], kernel, work_dim, global_work_offset,
-                                           global_work_size, local_work_size, 0, NULL, NULL));
+                                           global_work_size, NULL, 0, NULL, NULL));
 
     HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
