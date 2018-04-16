@@ -489,7 +489,6 @@ void call_for_all_particles_device_opencl(psdata_opencl pso, const char * kernel
 
     size_t num_workgroups = (n - 1) / pso.po2_workgroup_size + 1;
     size_t num_workitems = num_workgroups * pso.po2_workgroup_size;
-
     call_kernel_device_opencl(pso, kernel_name, 1, 0, &num_workitems, &pso.po2_workgroup_size);
 }
 
