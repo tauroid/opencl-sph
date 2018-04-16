@@ -4,6 +4,9 @@ CFLAGS=-std=c99
 BIN_FILES=$(shell find bin -type f)
 BUILD_FILES=$(shell find build -type f)
 
+CL_LIB_PATH=/pawsey/opencl-sdk/7.0.0/opencl/SDK/lib64
+CL_INCLUDE_PATH=/pawsey/opencl-sdk/7.0.0/opencl/SDK/include
+
 all: buildfolders native #mex
 
 native: bin/testopencl LibSPH
@@ -29,17 +32,17 @@ ifneq ($(strip $(BUILD_FILES)),)
 endif
 
 bin/testopencl: build/testopencl.o bin/libsph.so
-	$(CC) -Wl,-rpath,'$$ORIGIN' -fPIC $< -o $@ -lsph -Lbin -lm
+	$(CC) -Wl,-rpath,'$$ORIGIN' -fPIC $< -o $@ -L$(CL_LIB_PATH) -lOpenCL -lsph -Lbin -lm
 	@echo "$$(tput bold)$$(tput setaf 2)Built $@$$(tput sgr0)"
 
 LibSPH: bin/libsph.so
 
 bin/libsph.so: build/particle_system.o build/opencl/particle_system_host.o build/opencl/platforminfo.o build/opencl/clerror.o build/note.o build/config.o build/build_psdata.o build/stringly.o build/3rdparty/whereami.o
-	$(CC) -shared -fPIC $^ -o $@ -L/usr/lib/x86_64-linux-gnu/ -lOpenCL
+	$(CC) -shared -fPIC $^ -o $@ -L$(CL_LIB_PATH) -lOpenCL
 	@echo "$$(tput bold)$$(tput setaf 2)Built $@$$(tput sgr0)"
 
 build/%.o: src/%.c
-	$(CC) $(CFLAGS) -fPIC -c -ggdb $< -o $@
+	$(CC) $(CFLAGS) -fPIC -c -ggdb -I$(CL_INCLUDE_PATH) $< -o $@
 
 #bin/mex/%.m: src/mex/%.m
 #	cp $< $@
