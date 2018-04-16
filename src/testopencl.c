@@ -22,7 +22,7 @@ printf("chk0 ");
     set_log_level(1);
     psdata data;
 printf("chk1 ");    
-    load_config("/../conf/solid.conf");
+    load_config(CMAKE_SOURCE_DIR "/conf/solid.conf");
 printf("chk2 ");  
     build_psdata_from_string(&data, get_config_section("psdata_specification"));
 printf("chk3 ");  
