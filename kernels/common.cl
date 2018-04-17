@@ -1,4 +1,20 @@
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+//#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+//#include <real.h>
+
+#ifndef REALMACRO_H_
+#define REALMACRO_H_
+
+//#include <CL/opencl.h>
+//#include <CL/cl_platform.h>
+// floating point type macros : prefer 32bit for most hardware.
+typedef float REAL;	//double
+typedef float3 REAL3; 
+
+//#define REAL2 cl_float2	//double2
+//#define REAL3 cl_float3	//double3
+//#define REAL4 cl_float4	//double4
+
+#endif
 
 #define USE_FIELD(name, type) global type * name = (global type *) name##_m;
 #define USE_FIELD_FIRST_VALUE(name, type) private type name = *((global type *) name##_m);
@@ -12,7 +28,7 @@
                 global uint * dimensions,    global uint * num_dimensions, global uint * dimensions_offsets, global uint * entry_sizes,\
                 global void * data,          global uint * data_sizes,     global uint * data_offsets
 
-#define PI 3.1415926535
+#define PI 3.1416f// 3.1415926535  // float vs double PI 
 
 #define I_00 0
 #define I_01 1

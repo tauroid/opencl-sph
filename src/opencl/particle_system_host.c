@@ -27,7 +27,7 @@ static Platform const * _platforms;
 static unsigned int _num_platforms;
 
 // static targets to be replaced in later versions.
-static int target_platform = 0; // for Bracewell
+static int target_platform = 1; //1 for Bracewell
 static int target_device = 0; // 0,1,2,3 for Bracewell
 
 #ifdef MATLAB_MEX_FILE
@@ -60,6 +60,7 @@ void init_opencl()
 
     get_opencl_platform_info(&_platforms, &_num_platforms);
 printf("chk4.1 ");
+note(1, "\n");
     ASSERT(_num_platforms > 0);
 
     const cl_context_properties context_properties[] = {

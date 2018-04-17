@@ -2,6 +2,7 @@
 #define PARTICLE_SYSTEM_H_
 
 #include "macros.h"
+#include "real.h"
 
 
 

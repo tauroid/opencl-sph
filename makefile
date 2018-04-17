@@ -3,7 +3,13 @@ CC=$(shell which gcc)
 BIN_FILES=$(shell find bin -type f)
 BUILD_FILES=$(shell find build -type f)
 
-all: buildfolders native mex
+CL_LIB_PATH=/usr/lib/x86_64-linux-gnu/
+#/pawsey/opencl-sdk/7.0.0/opencl/SDK/lib64
+CL_INCLUDE_PATH=/usr/include/CL  
+#/pawsey/opencl-sdk/7.0.0/opencl/SDK/include
+CPATH=$PWD/src/:$CPATH
+
+all: buildfolders native #mex
 
 native: bin/testopencl LibSPH
 

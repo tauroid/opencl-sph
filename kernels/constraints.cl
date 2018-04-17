@@ -1,3 +1,4 @@
+
 kernel void apply_plane_constraints(PSO_ARGS) {
     USE_FIELD(position, REAL) USE_FIELD(velocity, REAL)
     USE_FIELD(plane_constraints, REAL) USE_FIELD(plane_constraints_particles, uint)

@@ -1,3 +1,20 @@
+//#include "../src/real.h"
+
+#ifndef REALMACRO_H_
+#define REALMACRO_H_
+
+// //#include <CL/opencl.h>
+//#include <CL/cl_platform.h>
+// floating point type macros : prefer 32bit for most hardware.
+typedef float REAL;	//double
+typedef float3 REAL3; 
+
+//#define REAL2 cl_float2	//double2
+//#define REAL3 cl_float3	//double3
+//#define REAL4 cl_float4	//double4
+
+#endif
+
 ////////// Physics stuff //////////
 
 inline void contributeApq (REAL3 p, REAL3 q, REAL weight, REAL apq[9]) {
@@ -208,14 +225,14 @@ kernel void compute_forces_solids (PSO_ARGS) {
     )
 
 #define FINALISE_SOLIDS_FORCE_COMPUTATION \
-    f_e *= 0.5;\
+    f_e *= 0.5f;\
     f_v *= viscosity;
 
     FINALISE_SOLIDS_FORCE_COMPUTATION
 
     REAL3 f = f_e + f_v;
 
-    APPLY_CUBE_BOUNDS(ipos, f, -2.0, 2.0)
+    APPLY_CUBE_BOUNDS(ipos, f, -2.0f, 2.0f)
 
     vstore3(f, i, force);
 
