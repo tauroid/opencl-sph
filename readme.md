@@ -18,10 +18,11 @@ Load Intel modules for compatibility
   module load intel-opencl-sdk 
   ```
   
-Create build and install folder
+Create build and install folder, and navigate into that folder
    ```shell
   mkdir mybuild
   mkdir install
+  cd mybuild
   ```
 
 Run Cmake with hint
