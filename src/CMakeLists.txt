@@ -1,7 +1,6 @@
-file(GLOB 3rdparty_SRCS 3rdparty/*.c)
 file(GLOB opencl_SRCS opencl/*.c)
 
-add_library(opencl_sph_lib STATIC ${3rdparty_SRCS} ${opencl_SRCS})
+add_library(opencl_sph_lib STATIC ${opencl_SRCS})
 
 set(opencl_sph_SRCS
 	build_psdata.c

@@ -9,7 +9,6 @@
 #include "particle_system_host.h"
 #include "../particle_system.h"
 #include "../note.h"
-#include "../3rdparty/whereami.h"
 #include "platforminfo.h"
 
 #define NUM_PS_ARGS 10
@@ -196,9 +195,7 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
 #endif
 
         const char * file_extension = ".cl";
-#ifndef MATLAB_MEX_FILE
-        /* const char * kern_rel_path = OPENCL_SPH_KERNELS_ROOT; */
-#else
+#ifdef MATLAB_MEX_FILE
 		const char * kern_rel_path = "/../../kernels/";
 #endif
 
@@ -254,10 +251,6 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
         }
 
         free(file_list_copy);
-
-#ifndef MATLAB_MEX_FILE
-        /* free(exe_path); */
-#endif
 
         char * compilation_unit_with_macros = add_field_macros_to_start_of_string(compilation_unit, data);
         free(compilation_unit);
