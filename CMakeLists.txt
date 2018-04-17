@@ -1,21 +1,14 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.2)
 project(opencl_sph)
 
-file(GLOB kernels kernels/*.cl)
-file(GLOB 3rdparty src/3rdparty/*.h src/3rdparty/*.c)
-file(GLOB opencl src/opencl/*.h src/opencl/*.c)
-file(GLOB srcs src/*.h src/*.c)
+set(CMAKE_C_STANDARD 11)
 
-find_package(OpenCL REQUIRED)
+find_package(OpenCL 1.2 REQUIRED)
+include_directories(${OpenCL_INCLUDE_DIRS})
+link_directories(${OpenCL_LIBRARY})
 
-link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(-DCMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+add_definitions(-DOPENCL_SPH_KERNELS_ROOT="${CMAKE_INSTALL_PREFIX}/share/opencl_sph/kernels/")
 
-set(CMAKE_CXX_STANDARD 11)
-
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -g -std=c++11")
-
-add_library(sph_libs STATIC ${kernels} ${3rdparty} ${opencl})
-
-add_executable(opencl_sph  ${srcs} )
-
-target_link_libraries(opencl_sph sph_libs OpenCL m)
+add_subdirectory(kernels)
+add_subdirectory(src)

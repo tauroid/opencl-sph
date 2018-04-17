@@ -1,3 +1,54 @@
+OpenCL-Athena
+==========
+How to run on Cluster
+
+first ssh
+  ```shell
+  ssh USERNAME@athena.pawsey.org.au
+
+  ```
+  
+Clone   
+   ```shell
+  git clone https://github.com/NH89/opencl-sph
+  ```
+  
+Load Intel modules for compatibility
+  ```shell
+  module load intel-opencl-sdk 
+  ```
+  
+Create build and install folder
+   ```shell
+  mkdir mybuild
+  mkdir install
+  ```
+
+Run Cmake with hint
+   ```shell
+  cmake -DCMAKE_INSTALL_PREFIX=../install .. -DOpenCL_LIBRARY=/pawsey/opencl-sdk/7.0.0/opencl/SDK/lib64/libOpenCL.so
+  ```
+(Alternatively load cuda module)
+   ```shell
+  cmake -DCMAKE_INSTALL_PREFIX=../install .. 
+  ```
+make targets
+  ```shell
+  make
+  make install 
+  ```
+Reserve resources of GPU
+```shell
+srun -A gpuhack02 -N 1 -p gpuq --reservation=gpu-hackathon --gres=gpu:2 --pty /bin/bash
+```
+Run executable
+  ```shell
+  ./install/bin/opencl_sph
+  ```
+
+Sit back and drink a coffee
+
+
 OpenCL-SPH
 ==========
 

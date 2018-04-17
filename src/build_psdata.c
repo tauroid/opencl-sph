@@ -458,8 +458,9 @@ static size_t length_field_spec_list(psdata_field_spec * list) {
 
     return length;
 }
-// Guarantees to link up all the entries in the given list so they can be freed with
-// the new root node. Sorting before creating the single large array prevents alignment issues
+// Guarantees to link up all the entries in the given list 
+// so they can be freed with the new root node. 
+// Sorting before creating the single large array prevents alignment issues
 static psdata_field_spec * sort_field_spec_list_by_type_size_descending(psdata_field_spec * list) {
     if (list == NULL) return NULL;
 

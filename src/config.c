@@ -34,13 +34,14 @@ void load_config(const char * relativePath) {
     char * exe_path = getenv("EXE_PATH");
 #endif
 
-    char * conf_path = malloc((strlen(exe_path)+strlen(relativePath)+1)*sizeof(char));
-    sprintf(conf_path, "%s%s", exe_path, relativePath);
+    /* char * conf_path = malloc((strlen(exe_path)+strlen(relativePath)+1)*sizeof(char)); */
+    /* sprintf(conf_path, "%s%s", exe_path, relativePath); */
+    char * conf_path = relativePath;
 
 #ifndef MATLAB_MEX_FILE
     free(exe_path);
 #endif
-
+printf(" ## opening file %s ", conf_path); // added to check what file is being read //
     // Copy the contents
     FILE * conf = fopen(conf_path, "rb");
 
@@ -49,7 +50,7 @@ void load_config(const char * relativePath) {
         ASSERT(0);
     }
 
-    free(conf_path);
+    /* free(conf_path); */
 
     fseek(conf, 0, SEEK_END);
     size_t conf_end = ftell(conf);
