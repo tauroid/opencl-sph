@@ -103,7 +103,7 @@ void write_psdata(psdata data, int number, const char* Case)
             char filename[150];
             //strcpy(filename, "/media/aslab/data/hackthon_data/");
             //strcat(filename, Case);
-            strcpy(filename, "../../positions/position_");
+            strcpy(filename, "position_");
             strcat(filename, snum);
             strcat(filename, ".csv");
 

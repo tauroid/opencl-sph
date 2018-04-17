@@ -12,3 +12,4 @@ add_definitions(-DOPENCL_SPH_KERNELS_ROOT="${CMAKE_INSTALL_PREFIX}/share/opencl_
 
 add_subdirectory(kernels)
 add_subdirectory(src)
+#SET( CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -std=c99" )

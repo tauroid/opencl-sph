@@ -6,3 +6,4 @@ Makefile
 *.cmake
 *.a
 *.csv
+*.map
