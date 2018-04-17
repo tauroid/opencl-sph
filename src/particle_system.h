@@ -2,8 +2,7 @@
 #define PARTICLE_SYSTEM_H_
 
 #include "macros.h"
-
-
+#include "types.h"
 
 #ifdef MATLAB_MEX_FILE
 #include "mex.h"
@@ -54,8 +53,8 @@ void free_stored_psdata();
 void display_psdata(psdata, const char * const * mask);
 void write_psdata(psdata, int number, const char * Case);
 
-void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, double smoothingradius,
-       double xbound1, double ybound1, double zbound1, double xbound2, double ybound2, double zbound2 );
+void init_psdata_fluid( psdata * data, int pnum, REAL mass, REAL timestep, REAL smoothingradius,
+       REAL xbound1, REAL ybound1, REAL zbound1, REAL xbound2, REAL ybound2, REAL zbound2 );
 
 int get_field_psdata( psdata data, const char * name );
 void set_field_psdata( psdata * data, const char * name, void * field, unsigned int size, unsigned int offset );

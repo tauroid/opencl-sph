@@ -10,4 +10,7 @@
     #define ASSERT(x) if (!(x)) mexErrMsgTxt(#x"\n")
 #endif
 
+#define STRINGIFY2(X) #X
+#define STRINGIFY(X) STRINGIFY2(X)
+
 #endif

@@ -9,6 +9,9 @@ link_directories(${OpenCL_LIBRARY})
 
 add_definitions(-DCMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_definitions(-DOPENCL_SPH_KERNELS_ROOT="${CMAKE_INSTALL_PREFIX}/share/opencl_sph/kernels/")
+if(OPENCL_SPH_REAL_TYPE)
+	add_definitions(-DOPENCL_SPH_REAL_TYPE=${OPENCL_SPH_REAL_TYPE})
+endif(OPENCL_SPH_REAL_TYPE)
 
 add_subdirectory(kernels)
 add_subdirectory(src)

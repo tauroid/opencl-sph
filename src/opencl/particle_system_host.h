@@ -65,12 +65,12 @@ void sync_psdata_host_to_device(psdata data, psdata_opencl pso, int full);
 void sync_psdata_fields_host_to_device(psdata data, psdata_opencl pso, size_t num_fields, const char * const * const field_names);
 
 void populate_position_cuboid_device_opencl(psdata_opencl pso,
-                                            double x1, double y1, double z1,
-                                            double x2, double y2, double z2,
+                                            REAL x1, REAL y1, REAL z1,
+                                            REAL x2, REAL y2, REAL z2,
                                             unsigned int xsize,
                                             unsigned int ysize,
                                             unsigned int zsize);
-void rotate_particles_device_opencl(psdata_opencl, double angle_x, double angle_y, double angle_z);
+void rotate_particles_device_opencl(psdata_opencl, REAL angle_x, REAL angle_y, REAL angle_z);
 void call_for_all_particles_device_opencl(psdata_opencl, const char * kernel_name);
 
 void compute_particle_bins_device_opencl(psdata_opencl);

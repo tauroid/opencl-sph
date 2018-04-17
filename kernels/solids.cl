@@ -1,13 +1,30 @@
+#ifndef OPENCL_SPH_REAL_TYPE
+#define OPENCL_SPH_REAL_TYPE float
+#endif
+
+typedef OPENCL_SPH_REAL_TYPE REAL;
+#if OPENCL_SPH_REAL_TYPE == float
+typedef float2 REAL2;
+typedef float3 REAL3;
+typedef float4 REAL4;
+#elif OPENCL_SPH_REAL_TYPE == double
+typedef double2 REAL2;
+typedef double3 REAL3;
+typedef double4 REAL4;
+#else
+#error "OPENCL_SPH_REAL_TYPE must be either float or double."
+#endif
+
 ////////// Physics stuff //////////
 
-inline void contributeApq (double3 p, double3 q, double weight, double apq[9]) {
-    double3 wp = weight*p;
+inline void contributeApq (REAL3 p, REAL3 q, REAL weight, REAL apq[9]) {
+    REAL3 wp = weight*p;
 
     apq[I_00] += wp.x*q.x; apq[I_01] += wp.x*q.y; apq[I_02] += wp.x*q.z;
     apq[I_10] += wp.y*q.x; apq[I_11] += wp.y*q.y; apq[I_12] += wp.y*q.z;
     apq[I_20] += wp.z*q.x; apq[I_21] += wp.z*q.y; apq[I_22] += wp.z*q.z;
 }
-inline void computeCauchyStrain (double deformation[9], global double strain[6]) {
+inline void computeCauchyStrain (REAL deformation[9], global REAL strain[6]) {
     strain[S_00] = deformation[I_00];
     strain[S_01] = 0.5*(deformation[I_01] + deformation[I_10]);
     strain[S_02] = 0.5*(deformation[I_02] + deformation[I_20]);
@@ -15,11 +32,11 @@ inline void computeCauchyStrain (double deformation[9], global double strain[6])
     strain[S_12] = 0.5*(deformation[I_12] + deformation[I_21]);
     strain[S_22] = deformation[I_22];
 }
-inline void computeStress (global double strain[6], double bulk_modulus, double shear_modulus, global double stress[6]) {
-    double lame_lambda = bulk_modulus - (2/3) * shear_modulus;
-    double lame_mu = shear_modulus;
+inline void computeStress (global REAL strain[6], REAL bulk_modulus, REAL shear_modulus, global REAL stress[6]) {
+    REAL lame_lambda = bulk_modulus - (2/3) * shear_modulus;
+    REAL lame_mu = shear_modulus;
 
-    double c[36] = {
+    REAL c[36] = {
         lame_lambda + 2 * lame_mu, lame_lambda              , lame_lambda              , 0          , 0          , 0          ,
         lame_lambda              , lame_lambda + 2 * lame_mu, lame_lambda              , 0          , 0          , 0          ,
         lame_lambda              , lame_lambda              , lame_lambda + 2 * lame_mu, 0          , 0          , 0          ,
@@ -37,14 +54,14 @@ inline void computeStress (global double strain[6], double bulk_modulus, double 
 ////////// Particle creation and transformation //////////
 
 kernel void init_original_position (PSO_ARGS) {
-    USE_FIELD(position, double) USE_FIELD(originalpos, double)
+    USE_FIELD(position, REAL) USE_FIELD(originalpos, REAL)
     USE_FIELD_FIRST_VALUE(n, uint)
 
     unsigned int i = get_global_id(0);
 
     if (i >= n) return;
 
-    double3 pos = vload3(i, position);
+    REAL3 pos = vload3(i, position);
 
     vstore3(pos, i, originalpos);
 }
@@ -56,57 +73,57 @@ kernel void compute_rotations_and_strains (PSO_ARGS) {
 
     USE_FIELD_FIRST_VALUE(n, uint)
 
-    USE_FIELD(rotation, double) USE_FIELD(strain, double) USE_FIELD(position, double)
-    USE_FIELD(originalpos, double) USE_FIELD_FIRST_VALUE(smoothingradius, double)
-    USE_FIELD(density0, double) USE_FIELD_FIRST_VALUE(mass, double)
-    USE_FIELD(density, double)
+    USE_FIELD(rotation, REAL) USE_FIELD(strain, REAL) USE_FIELD(position, REAL)
+    USE_FIELD(originalpos, REAL) USE_FIELD_FIRST_VALUE(smoothingradius, REAL)
+    USE_FIELD(density0, REAL) USE_FIELD_FIRST_VALUE(mass, REAL)
+    USE_FIELD(density, REAL)
 
     uint i = get_global_id(0);
 
     if (i >= n) return;
 
-    double3 ipos = vload3(i, position);
-    double3 ipos0 = vload3(i, originalpos);
+    REAL3 ipos = vload3(i, position);
+    REAL3 ipos0 = vload3(i, originalpos);
 
-    double apq[9];
+    REAL apq[9];
 
     for (uint d = 0; d < 9; ++d) apq[d] = 0;
 
     FOR_PARTICLES_IN_RANGE(i, j,
         if (j == i) continue;
 
-        double3 p = vload3(j, position) - ipos;
-        double3 q = vload3(j, originalpos) - ipos0;
+        REAL3 p = vload3(j, position) - ipos;
+        REAL3 q = vload3(j, originalpos) - ipos0;
 
         contributeApq(p, q, applyKernel(length(p), smoothingradius), apq);
     )
 
-    global double * r = rotation + i*3*3;
+    global REAL * r = rotation + i*3*3;
 
     getR(apq, r);
 
-    double r_t[9];
+    REAL r_t[9];
 
     transpose(r, r_t);
 
-    double deformation[9];
+    REAL deformation[9];
 
     for (uint d = 0; d < 9; ++d) deformation[d] = 0;
 
     FOR_PARTICLES_IN_RANGE(i, j,
         if (j == i) continue;
 
-        double3 p = vload3(j, position) - ipos;
+        REAL3 p = vload3(j, position) - ipos;
         p = multiplyMatrixVectorPrivate(r_t, p);
 
-        double3 q = vload3(j, originalpos) - ipos0;
+        REAL3 q = vload3(j, originalpos) - ipos0;
 
-        double3 u = p-q;
+        REAL3 u = p-q;
 
         addOuterProduct(u*mass/density0[i], applyKernelGradient(q, smoothingradius), deformation);
     )
 
-    global double * s = strain + i*6;
+    global REAL * s = strain + i*6;
 
     zeroArray(s, 6);
 
@@ -115,25 +132,25 @@ kernel void compute_rotations_and_strains (PSO_ARGS) {
 kernel void compute_original_density (PSO_ARGS) {
     USE_GRID_PROPS
 
-    USE_FIELD_FIRST_VALUE(pnum, uint) USE_FIELD_FIRST_VALUE(n, uint) USE_FIELD_FIRST_VALUE(mass, double)
-    USE_FIELD(position, double) USE_FIELD(density0, double) USE_FIELD_FIRST_VALUE(smoothingradius, double)
+    USE_FIELD_FIRST_VALUE(pnum, uint) USE_FIELD_FIRST_VALUE(n, uint) USE_FIELD_FIRST_VALUE(mass, REAL)
+    USE_FIELD(position, REAL) USE_FIELD(density0, REAL) USE_FIELD_FIRST_VALUE(smoothingradius, REAL)
 
     unsigned int i = get_global_id(0);
 
     if (i >= n) return;
 
-    double3 ipos = vload3(i, position);
+    REAL3 ipos = vload3(i, position);
 
     density0[i] = 0;
 
     FOR_PARTICLES_IN_RANGE(i, j,
         j = cellparticles[jp];
 
-        double3 jpos = vload3(j, position);
+        REAL3 jpos = vload3(j, position);
 
-        double3 diff = jpos - ipos;
+        REAL3 diff = jpos - ipos;
 
-        double dist = length(diff);
+        REAL dist = length(diff);
 
         density0[i] += applyKernel(dist, smoothingradius);
     )
@@ -141,8 +158,8 @@ kernel void compute_original_density (PSO_ARGS) {
     density0[i] *= mass;
 }
 kernel void compute_stresses (PSO_ARGS) {
-    USE_FIELD(strain, double) USE_FIELD(stress, double)
-    USE_FIELD_FIRST_VALUE(bulk_modulus, double) USE_FIELD_FIRST_VALUE(shear_modulus, double)
+    USE_FIELD(strain, REAL) USE_FIELD(stress, REAL)
+    USE_FIELD_FIRST_VALUE(bulk_modulus, REAL) USE_FIELD_FIRST_VALUE(shear_modulus, REAL)
 
     USE_FIELD_FIRST_VALUE(n, uint)
 
@@ -158,27 +175,27 @@ kernel void compute_forces_solids (PSO_ARGS) {
 
     USE_FIELD_FIRST_VALUE(n, uint)
 
-    USE_FIELD(originalpos, double) USE_FIELD_FIRST_VALUE(smoothingradius, double)
-    USE_FIELD(stress, double) USE_FIELD_FIRST_VALUE(mass, double) USE_FIELD(density0, double)
-    USE_FIELD(rotation, double) USE_FIELD(force, double) USE_FIELD(velocity, double)
-    USE_FIELD_FIRST_VALUE(viscosity, double) USE_FIELD(density, double) USE_FIELD(position, double)
+    USE_FIELD(originalpos, REAL) USE_FIELD_FIRST_VALUE(smoothingradius, REAL)
+    USE_FIELD(stress, REAL) USE_FIELD_FIRST_VALUE(mass, REAL) USE_FIELD(density0, REAL)
+    USE_FIELD(rotation, REAL) USE_FIELD(force, REAL) USE_FIELD(velocity, REAL)
+    USE_FIELD_FIRST_VALUE(viscosity, REAL) USE_FIELD(density, REAL) USE_FIELD(position, REAL)
 
     unsigned int i = get_global_id(0);
 
     if (i >= n) return;
 
-    double3 ipos = vload3(i, position);
-    double3 ivel = vload3(i, velocity);
+    REAL3 ipos = vload3(i, position);
+    REAL3 ivel = vload3(i, velocity);
 
 // Repurpose for later batches
 #define INIT_SOLIDS_FORCE_COMPUTATION \
-    double3 ipos0 = vload3(i, originalpos);\
+    REAL3 ipos0 = vload3(i, originalpos);\
 \
-    global double * i_stress = stress + i*6;\
-    global double * i_rotation = rotation + i*3*3;\
+    global REAL * i_stress = stress + i*6;\
+    global REAL * i_rotation = rotation + i*3*3;\
 \
-    double3 f_e = (double3)(0, 0, 0);\
-    double3 f_v = (double3)(0, 0, 0);
+    REAL3 f_e = (REAL3)(0, 0, 0);\
+    REAL3 f_v = (REAL3)(0, 0, 0);
 
     INIT_SOLIDS_FORCE_COMPUTATION
 
@@ -186,21 +203,21 @@ kernel void compute_forces_solids (PSO_ARGS) {
         if (j == i) continue;
 
 #define SOLIDS_FORCE_COMPUTATION \
-        double3 jpos0 = vload3(j, originalpos);\
+        REAL3 jpos0 = vload3(j, originalpos);\
 \
-        global double * j_stress = stress + j*6;\
+        global REAL * j_stress = stress + j*6;\
 \
-        double3 x = jpos0 - ipos0;\
-        double vivj = mass*mass/density0[i]/density0[j];\
-        double3 f_ji = -vivj * multiplySymMatrixVector(i_stress, applyKernelGradient(x, smoothingradius));\
-        double3 f_ij = -vivj * multiplySymMatrixVector(j_stress, applyKernelGradient(-x, smoothingradius));\
+        REAL3 x = jpos0 - ipos0;\
+        REAL vivj = mass*mass/density0[i]/density0[j];\
+        REAL3 f_ji = -vivj * multiplySymMatrixVector(i_stress, applyKernelGradient(x, smoothingradius));\
+        REAL3 f_ij = -vivj * multiplySymMatrixVector(j_stress, applyKernelGradient(-x, smoothingradius));\
 \
-        global double * j_rotation = rotation + j*3*3;\
+        global REAL * j_rotation = rotation + j*3*3;\
 \
         f_e += -multiplyMatrixVector(i_rotation, f_ji) + multiplyMatrixVector(j_rotation, f_ij);\
 \
-        double3 jpos = vload3(j, position);\
-        double3 jvel = vload3(j, velocity);\
+        REAL3 jpos = vload3(j, position);\
+        REAL3 jvel = vload3(j, velocity);\
 \
         f_v += mass/density[j] * (jvel - ivel) * applyLapKernel(length(jpos - ipos), smoothingradius);
 
@@ -208,15 +225,14 @@ kernel void compute_forces_solids (PSO_ARGS) {
     )
 
 #define FINALISE_SOLIDS_FORCE_COMPUTATION \
-    f_e *= 0.5;\
+    f_e *= 0.5f;\
     f_v *= viscosity;
 
     FINALISE_SOLIDS_FORCE_COMPUTATION
 
+    REAL3 f = f_e + f_v;
 
-    double3 f = f_e + f_v;
-
-    APPLY_CUBE_BOUNDS(ipos, f, -2.0, 2.0)
+    APPLY_CUBE_BOUNDS(ipos, f, -2.0f, 2.0f)
 
     vstore3(f, i, force);
 

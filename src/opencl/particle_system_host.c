@@ -6,6 +6,8 @@
 #include <CL/opencl.h>
 
 #include "clerror.h"
+#include "../macros.h"
+#include "../types.h"
 #include "particle_system_host.h"
 #include "../particle_system.h"
 #include "../note.h"
@@ -28,6 +30,7 @@ static unsigned int _num_platforms;
 
 // static targets to be replaced in later versions.
 static int target_platform = 1; // for Bracewell
+
 static int target_device = 0; // 0,1,2,3 for Bracewell
 
 #ifdef MATLAB_MEX_FILE
@@ -60,6 +63,7 @@ void init_opencl()
 
     get_opencl_platform_info(&_platforms, &_num_platforms);
 printf("chk4.1 ");
+note(1, "\n");
     ASSERT(_num_platforms > 0);
 
     const cl_context_properties context_properties[] = {
@@ -263,7 +267,8 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
         free(compilation_unit_with_macros);
     }
 
-    cl_int build_error = clBuildProgram(pso->ps_prog, 1, &_platforms[target_platform].devices[target_device].id, NULL/*"-cl-fast-relaxed-math"*/, NULL, NULL); // replaced [0] with [target_platform]..[target_device]
+	const char* buildDefines = "-DOPENCL_SPH_REAL_TYPE=" STRINGIFY(OPENCL_SPH_REAL_TYPE);
+    cl_int build_error = clBuildProgram(pso->ps_prog, 1, &_platforms[target_platform].devices[target_device].id, buildDefines, NULL, NULL); // replaced [0] with [target_platform]..[target_device]
 
     if (build_error != CL_SUCCESS) {
         char * error_log;
@@ -490,29 +495,29 @@ void call_for_all_particles_device_opencl(psdata_opencl pso, const char * kernel
 }
 
 void populate_position_cuboid_device_opencl(psdata_opencl pso,
-                                            double x1, double y1, double z1,
-                                            double x2, double y2, double z2,
+                                            REAL x1, REAL y1, REAL z1,
+                                            REAL x2, REAL y2, REAL z2,
                                             unsigned int xsize,
                                             unsigned int ysize,
                                             unsigned int zsize)
 {
     size_t work_group_edge = (size_t) pow
-        ((double) _platforms[target_platform].devices[target_device].max_workgroup_size, 1.0/3.0);//replaced [0] with [target_platform] ... [target_device]
+        ((REAL) _platforms[target_platform].devices[target_device].max_workgroup_size, 1.0/3.0);//replaced [0] with [target_platform] ... [target_device]
     size_t local_work_size[] = { work_group_edge, work_group_edge, work_group_edge };
     size_t global_work_size[] = { (xsize/work_group_edge + 1) * work_group_edge,
                                   (ysize/work_group_edge + 1) * work_group_edge,
                                   (zsize/work_group_edge + 1) * work_group_edge };
 
-    cl_double3 corner1 = {{ x1, y1, z1 }};
-    cl_double3 corner2 = {{ x2, y2, z2 }};
+    REAL3 corner1 = {{ x1, y1, z1 }};
+    REAL3 corner2 = {{ x2, y2, z2 }};
     cl_uint3 size = {{ xsize, ysize, zsize }};
 
     cl_kernel cuboid = get_kernel(pso, "populate_position_cuboid");
 
     ASSERT(cuboid != NULL);
 
-    HANDLE_CL_ERROR(clSetKernelArg(cuboid, NUM_PS_ARGS, sizeof(cl_double3), &corner1));
-    HANDLE_CL_ERROR(clSetKernelArg(cuboid, NUM_PS_ARGS+1, sizeof(cl_double3), &corner2));
+    HANDLE_CL_ERROR(clSetKernelArg(cuboid, NUM_PS_ARGS, sizeof(REAL3), &corner1));
+    HANDLE_CL_ERROR(clSetKernelArg(cuboid, NUM_PS_ARGS+1, sizeof(REAL3), &corner2));
     HANDLE_CL_ERROR(clSetKernelArg(cuboid, NUM_PS_ARGS+2, sizeof(cl_uint3), &size));
 
     HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], cuboid, 3, NULL,
@@ -521,7 +526,7 @@ void populate_position_cuboid_device_opencl(psdata_opencl pso,
     HANDLE_CL_ERROR(clFinish(_command_queues[0]));
 }
 
-void rotate_particles_device_opencl(psdata_opencl pso, double angle_x, double angle_y, double angle_z)
+void rotate_particles_device_opencl(psdata_opencl pso, REAL angle_x, REAL angle_y, REAL angle_z)
 {
     unsigned int * pN;
 
@@ -536,9 +541,9 @@ void rotate_particles_device_opencl(psdata_opencl pso, double angle_x, double an
 
     ASSERT(rotate_particles != NULL);
 
-    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS, sizeof(cl_double), &angle_x));
-    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS+1, sizeof(cl_double), &angle_y));
-    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS+2, sizeof(cl_double), &angle_z));
+    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS, sizeof(REAL), &angle_x));
+    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS+1, sizeof(REAL), &angle_y));
+    HANDLE_CL_ERROR(clSetKernelArg(rotate_particles, NUM_PS_ARGS+2, sizeof(REAL), &angle_z));
 
     HANDLE_CL_ERROR(clEnqueueNDRangeKernel(_command_queues[0], rotate_particles, 1, NULL,
                                            &num_workitems, &pso.po2_workgroup_size,

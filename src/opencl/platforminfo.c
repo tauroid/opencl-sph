@@ -143,15 +143,17 @@ void get_opencl_platform_info(Platform const ** const pptr, unsigned int * const
             }
             note(1, " %zu\n", device->max_work_item_sizes[i]);
 
-            if (device->double_supported)
+            if (device->double_supported) {
                 clGetDeviceInfo
                     (device->id, CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE, sizeof(cl_uint),
                      &device->pref_vector_width, NULL);
-            else
-                clGetDeviceInfo
-                    (device->id, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, sizeof(cl_uint),
-                     &device->pref_vector_width, NULL);
-            note(1, " > Preferred vector width (floating point): %u\n", device->pref_vector_width);
+                    note(1, " > Preferred vector width (double floating point): %u\n", device->pref_vector_width);
+            }
+            
+            clGetDeviceInfo
+                (device->id, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, sizeof(cl_uint),
+                &device->pref_vector_width, NULL);
+            note(1, " > Preferred vector width (single floating point): %u\n", device->pref_vector_width);
 
             note(1, "\n");
         }

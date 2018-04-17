@@ -1,6 +1,23 @@
+#ifndef OPENCL_SPH_REAL_TYPE
+#define OPENCL_SPH_REAL_TYPE float
+#endif
+
+typedef OPENCL_SPH_REAL_TYPE REAL;
+#if OPENCL_SPH_REAL_TYPE == float
+typedef float2 REAL2;
+typedef float3 REAL3;
+typedef float4 REAL4;
+#elif OPENCL_SPH_REAL_TYPE == double
+typedef double2 REAL2;
+typedef double3 REAL3;
+typedef double4 REAL4;
+#else
+#error "OPENCL_SPH_REAL_TYPE must be either float or double."
+#endif
+
 kernel void apply_plane_constraints(PSO_ARGS) {
-    USE_FIELD(position, double) USE_FIELD(velocity, double)
-    USE_FIELD(plane_constraints, double) USE_FIELD(plane_constraints_particles, uint)
+    USE_FIELD(position, REAL) USE_FIELD(velocity, REAL)
+    USE_FIELD(plane_constraints, REAL) USE_FIELD(plane_constraints_particles, uint)
 
     USE_FIELD_FIRST_VALUE(n, uint)
 
@@ -8,13 +25,13 @@ kernel void apply_plane_constraints(PSO_ARGS) {
 
     if (i >= n || plane_constraints_particles[i] == 0) return;
 
-    global double * plane_constraint = plane_constraints + (plane_constraints_particles[i]-1)*6;
+    global REAL * plane_constraint = plane_constraints + (plane_constraints_particles[i]-1)*6;
 
-    double3 point = vload3(0, plane_constraint);
-    double3 normal = vload3(1, plane_constraint);
+    REAL3 point = vload3(0, plane_constraint);
+    REAL3 normal = vload3(1, plane_constraint);
 
-    double3 ipos = vload3(i, position);
-    double3 ivel = vload3(i, velocity);
+    REAL3 ipos = vload3(i, position);
+    REAL3 ivel = vload3(i, velocity);
 
     ipos = ipos - dot(normal, ipos - point) * normal;
     ivel = ivel - dot(normal, ivel) * normal;
