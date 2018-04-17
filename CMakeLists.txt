@@ -15,3 +15,4 @@ endif(OPENCL_SPH_REAL_TYPE)
 
 add_subdirectory(kernels)
 add_subdirectory(src)
+#SET( CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -std=c99" )
