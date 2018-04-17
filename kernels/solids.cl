@@ -213,9 +213,12 @@ kernel void compute_forces_solids (PSO_ARGS) {
 
     FINALISE_SOLIDS_FORCE_COMPUTATION
 
+
     double3 f = f_e + f_v;
 
     APPLY_CUBE_BOUNDS(ipos, f, -2.0, 2.0)
 
     vstore3(f, i, force);
+
+
 }

@@ -31,6 +31,7 @@ printf("chk3 ");
     double * density0;
 
     double * rotation;
+    uint numSteps = 2000;
 
     PS_GET_FIELD(data, "position", double, &position);
     PS_GET_FIELD(data, "originalpos", double, &originalpos);
@@ -48,6 +49,8 @@ printf("chk5.2 "); // for some reason work group size is zero after this, but 51
 printf("chk5.3 "); 
             rotate_particles_device_opencl(pso, PI/4, 0, PI/6);
 printf(" chk6 ");  
+for(int i = 0; i<numSteps;i++)
+   {
             compute_particle_bins_device_opencl(pso);
 printf(" chk7 ");  
             call_for_all_particles_device_opencl(pso, "compute_original_density");
@@ -59,16 +62,16 @@ printf(" chk9 ");
             call_for_all_particles_device_opencl(pso, "compute_forces_solids");
 printf(" chk10 "); 
             call_for_all_particles_device_opencl(pso, "step_forward");
-printf(" chk11 ");         
+        
             sync_psdata_device_to_host(data, pso);
-printf(" chk12 "); 
+        write_psdata(data, i, "solid");
+}
         free_psdata_opencl(&pso);
 printf(" chk13 "); 
     terminate_opencl();
 printf(" chk14 "); 
     unload_config();
-
-    display_psdata(data, NULL);
+    //display_psdata(data, NULL);
 
     free_psdata(&data);
 

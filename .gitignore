@@ -5,3 +5,4 @@ bin
 Makefile
 *.cmake
 *.a
+*.csv
