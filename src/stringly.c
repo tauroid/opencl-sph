@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stringly.h"
+#include "types.h"
 
 void * allocate_string_typed_array(const char * type, size_t num_elements) {
     void * data = calloc(num_elements, sizeof_string_type(type));

@@ -1,20 +1,13 @@
 //#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-//#include <real.h>
 
-#ifndef REALMACRO_H_
-#define REALMACRO_H_
-
-//#include <CL/opencl.h>
-//#include <CL/cl_platform.h>
-// floating point type macros : prefer 32bit for most hardware.
-typedef float REAL;	//double
-typedef float3 REAL3; 
-
-//#define REAL2 cl_float2	//double2
-//#define REAL3 cl_float3	//double3
-//#define REAL4 cl_float4	//double4
-
+#ifndef OPENCL_SPH_REAL_TYPE
+#define OPENCL_SPH_REAL_TYPE float
 #endif
+
+typedef float REAL;
+typedef float2 REAL2;
+typedef float3 REAL3;
+typedef float4 REAL4;
 
 #define USE_FIELD(name, type) global type * name = (global type *) name##_m;
 #define USE_FIELD_FIRST_VALUE(name, type) private type name = *((global type *) name##_m);

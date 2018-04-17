@@ -1,3 +1,11 @@
+#ifndef OPENCL_SPH_REAL_TYPE
+#define OPENCL_SPH_REAL_TYPE float
+#endif
+
+typedef float REAL;
+typedef float2 REAL2;
+typedef float3 REAL3;
+typedef float4 REAL4;
 
 kernel void compute_forces_multiphysics (PSO_ARGS) {
     USE_GRID_PROPS

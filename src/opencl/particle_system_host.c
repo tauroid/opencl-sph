@@ -6,6 +6,8 @@
 #include <CL/opencl.h>
 
 #include "clerror.h"
+#include "../macros.h"
+#include "../types.h"
 #include "particle_system_host.h"
 #include "../particle_system.h"
 #include "../note.h"
@@ -264,7 +266,8 @@ void build_program(psdata * data, psdata_opencl * pso, const char * file_list)
         free(compilation_unit_with_macros);
     }
 
-    cl_int build_error = clBuildProgram(pso->ps_prog, 1, &_platforms[target_platform].devices[target_device].id, NULL/*"-cl-fast-relaxed-math"*/, NULL, NULL); // replaced [0] with [target_platform]..[target_device]
+	const char* buildDefines = "-DOPENCL_SPH_REAL_TYPE=" STRINGIFY(OPENCL_SPH_REAL_TYPE);
+    cl_int build_error = clBuildProgram(pso->ps_prog, 1, &_platforms[target_platform].devices[target_device].id, buildDefines, NULL, NULL); // replaced [0] with [target_platform]..[target_device]
 
     if (build_error != CL_SUCCESS) {
         char * error_log;

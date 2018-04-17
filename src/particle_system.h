@@ -2,9 +2,7 @@
 #define PARTICLE_SYSTEM_H_
 
 #include "macros.h"
-#include "real.h"
-
-
+#include "types.h"
 
 #ifdef MATLAB_MEX_FILE
 #include "mex.h"
