@@ -1,6 +1,7 @@
 #ifndef PARTICLE_SYSTEM_H_
 #define PARTICLE_SYSTEM_H_
 
+#include "datatypes.h"
 #include "macros.h"
 
 #ifdef MATLAB_MEX_FILE
@@ -24,8 +25,8 @@ typedef struct {
      * These are kept host-side throughout as I don't know anything about
      * their internal structure.
      */
-    unsigned int num_fields;
-    const char * names;
+    unsigned int   num_fields;
+    const char   * names;
     unsigned int * names_offsets;
     unsigned int * dimensions; /* e.g. { 30, 3 } */
     unsigned int * num_dimensions; /* 2 for example above */
@@ -36,7 +37,10 @@ typedef struct {
     unsigned int * data_sizes;
     unsigned int * data_offsets;
 
+    DataPtr      * data_ptrs;
+
     /* Fields not needed in computation - won't be sent to GPU */
+
     unsigned int num_host_fields;
     char ** host_names;
     void ** host_data;

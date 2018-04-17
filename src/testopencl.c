@@ -21,7 +21,10 @@ int main(int argc, char *argv[])
     set_log_level(1);
     psdata data;
 
-    load_config("/../conf/solid.conf");
+    {
+        int error = load_config("conf/solid.conf");
+        if (error) return error;
+    }
 
     build_psdata_from_string(&data, get_config_section("psdata_specification"));
 
@@ -40,6 +43,9 @@ int main(int argc, char *argv[])
     init_opencl();
         psdata_opencl pso = create_psdata_opencl(&data, get_config_section("opencl_kernel_files"));
             populate_position_cuboid_device_opencl(pso, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 6, 6, 6);
+
+            sync_psdata_device_to_host(data, pso);
+
             call_for_all_particles_device_opencl(pso, "init_original_position");
             rotate_particles_device_opencl(pso, PI/4, 0, PI/6);
 

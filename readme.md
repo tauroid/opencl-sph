@@ -16,7 +16,7 @@ Installation
   git clone https://github.com/tauroid/opencl-sph
   ```
 
-* Edit the first line of [makefile](makefile) to point to your MATLAB installation
+* `cmake .`
 
 * `make`
 
@@ -27,8 +27,4 @@ This has only been tested on linux, with gcc.
 Usage
 -----
 
-The current interface is through MATLAB - see [go.m](go.m) or [go_fluid.m](go_fluid.m).
-
-These implement an elastic solid based on [Becker et al. 2009](http://cg.informatik.uni-freiburg.de/publications/2009_NP_corotatedSPH.pdf) and a simple pressure gradient fluid respectively.
-
-Using particle configurations other than a cube at the moment requires manual specification in the `position` field of psdata.
+There are a number of Jupyter Notebooks in the [scripts](scripts) folder calling the python interface in various ways - see these for example usage.

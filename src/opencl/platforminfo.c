@@ -22,6 +22,8 @@ void get_opencl_platform_info(Platform const ** const pptr, unsigned int * const
     if (_platforms != NULL) {
         *pptr = _platforms;
         *npptr = _nplatforms;
+
+        return;
     }
 
     cl_platform_id * platform_ids;

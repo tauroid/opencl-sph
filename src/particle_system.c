@@ -34,6 +34,7 @@ void free_stored_psdata() {
 }
 #endif
 
+// These need severe looking at because of the float thing
 void display_entry(psdata data, size_t offset, size_t size) {
     if (size == 8) {
         note(2, "%g, ", *((double*)((char*)data.data + offset)));
@@ -42,6 +43,7 @@ void display_entry(psdata data, size_t offset, size_t size) {
     }
 }
 
+// And you
 void display_psdata(psdata data, const char * const * mask) {
     if (mask == NULL) {
         for (size_t field = 0; field < data.num_fields; ++field) {
@@ -79,225 +81,6 @@ void display_psdata(psdata data, const char * const * mask) {
     }
 }
 
-void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, double smoothingradius,
-                        double xbound1, double ybound1, double zbound1,
-                        double xbound2, double ybound2, double zbound2 )
-{
-    { /* Names */
-    const char * names_ref[] = {
-        "pnum",
-        "n",
-        "mass",
-        "timestep",
-        "smoothingradius",
-
-        "position",
-        "posnext",
-        "velocity",
-        "veleval",
-        "velnext",
-        "acceleration",
-        "force",
-        "density",
-        "volume",
-
-        "gridbounds",
-        "gridres",
-        "gridcell",
-        "gridcount",
-        "celloffset",
-        "cellparticles"
-    };
-
-    unsigned int i;
-    unsigned int sum = 0;
-
-    data->num_fields = sizeof(names_ref)/sizeof(char*);
-    data->names_offsets = malloc(data->num_fields*sizeof(unsigned int));
-
-    for (i = 0; i < data->num_fields; ++i) {
-        data->names_offsets[i] = sum;
-        sum += strlen(names_ref[i]) + 1;
-    }
-
-    data->names = malloc(sum*sizeof(char));
-
-    char * name_ptr;
-    for (i = 0; i < data->num_fields; ++i) {
-        name_ptr = (char*) data->names + data->names_offsets[i];
-        strcpy(name_ptr, names_ref[i]);
-    }
-    }
-
-    unsigned int num_gridcells_x = (unsigned int) (fabs(xbound2 - xbound1) / smoothingradius);
-    unsigned int num_gridcells_y = (unsigned int) (fabs(ybound2 - ybound1) / smoothingradius);
-    unsigned int num_gridcells_z = (unsigned int) (fabs(zbound2 - zbound1) / smoothingradius);
-
-    { /* Dimensions */
-    unsigned int dimensions[] = {
-        1,
-        1,
-        1,
-        1,
-        1,
-
-        pnum, 3,
-        pnum, 3,
-        pnum, 3,
-        pnum, 3,
-        pnum, 3,
-        pnum, 3,
-        pnum, 3,
-        pnum,
-        pnum,
-
-        2, 3,
-        3,
-        pnum,
-        num_gridcells_x, num_gridcells_y, num_gridcells_z,
-        num_gridcells_x, num_gridcells_y, num_gridcells_z,
-        pnum
-    };
-
-    unsigned int num_dimensions[] = { 1, 1, 1, 1, 1,  2, 2, 2, 2, 2, 2, 2, 1, 1,  2, 1, 1, 3, 3, 1 };
-
-    unsigned int entry_sizes[] = {
-        sizeof(int),
-        sizeof(int),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-        sizeof(double),
-
-        sizeof(double),
-        sizeof(unsigned int),
-        sizeof(unsigned int),
-        sizeof(unsigned int),
-        sizeof(unsigned int),
-        sizeof(unsigned int)
-    };
-
-    data->num_dimensions     = malloc(data->num_fields*sizeof(unsigned int));
-    data->dimensions_offsets = malloc(data->num_fields*sizeof(unsigned int));
-    data->entry_sizes        = malloc(data->num_fields*sizeof(unsigned int));
-
-    memcpy(data->num_dimensions, num_dimensions, data->num_fields*sizeof(unsigned int));
-    memcpy(data->entry_sizes,    entry_sizes,    data->num_fields*sizeof(unsigned int));
-
-    unsigned int i;
-    unsigned int sum = 0;
-    for (i = 0; i < data->num_fields; ++i) {
-        data->dimensions_offsets[i] = sum;
-        sum += num_dimensions[i];
-    }
-
-    data->dimensions = malloc(sum*sizeof(unsigned int));
-    
-    memcpy(data->dimensions, dimensions, sum*sizeof(unsigned int));
-    }
-
-    { /* Data */
-    unsigned int data_size = 0, field_data_size;
-
-    data->data_sizes = malloc(data->num_fields*sizeof(unsigned int));
-    data->data_offsets = malloc(data->num_fields*sizeof(unsigned int));
-
-    unsigned int i, j;
-    for (i = 0; i < data->num_fields; ++i) {
-        field_data_size = data->entry_sizes[i];
-
-        for (j = 0; j < data->num_dimensions[i]; ++j) {
-            field_data_size *= data->dimensions[data->dimensions_offsets[i]+j];
-        }
-
-        data->data_sizes[i] = field_data_size;
-        data->data_offsets[i] = data_size;
-
-        data_size += field_data_size;
-    }
-
-    data->data = calloc(data_size, 1);
-    }
-
-    { /* Assign some values */
-    set_field_psdata(data, "pnum", &pnum, sizeof(int), 0);
-    set_field_psdata(data, "mass", &mass, sizeof(double), 0);
-    set_field_psdata(data, "timestep", &timestep, sizeof(double), 0);
-    set_field_psdata(data, "smoothingradius", &smoothingradius, sizeof(double), 0);
-
-    double gridbounds[] = { xbound1, xbound2, ybound1, ybound2, zbound1, zbound2 };
-    set_field_psdata(data, "gridbounds", gridbounds, sizeof(gridbounds), 0);
-
-    unsigned int gridres[] = { num_gridcells_x, num_gridcells_y, num_gridcells_z };
-    set_field_psdata(data, "gridres", gridres, sizeof(gridres), 0);
-
-    data->num_host_fields = 0;
-    }
-
-    { /* MATLAB bollocks */
-#ifdef MATLAB_MEX_FILE
-    mxArray * position_mex     = mxCreateNumericArray( data->num_dimensions[5],
-                                                       data->dimensions+data->dimensions_offsets[5],
-                                                       mxDOUBLE_CLASS, mxREAL );
-    mxArray * posnext_mex      = mxCreateNumericArray( data->num_dimensions[6],
-                                                       data->dimensions+data->dimensions_offsets[6],
-                                                       mxDOUBLE_CLASS, mxREAL );
-    mxArray * velocity_mex     = mxCreateNumericArray( data->num_dimensions[7],
-                                                       data->dimensions+data->dimensions_offsets[7],
-                                                       mxDOUBLE_CLASS, mxREAL );
-    mxArray * veleval_mex      = mxCreateNumericArray( data->num_dimensions[8],
-                                                       data->dimensions+data->dimensions_offsets[8],
-                                                       mxDOUBLE_CLASS, mxREAL );
-    mxArray * velnext_mex      = mxCreateNumericArray( data->num_dimensions[9],
-                                                       data->dimensions+data->dimensions_offsets[9],
-                                                       mxDOUBLE_CLASS, mxREAL );
-    mxArray * acceleration_mex = mxCreateNumericArray( data->num_dimensions[10],
-                                                       data->dimensions+data->dimensions_offsets[10],
-                                                       mxDOUBLE_CLASS, mxREAL );
-    mxArray * force_mex        = mxCreateNumericArray( data->num_dimensions[11],
-                                                       data->dimensions+data->dimensions_offsets[11],
-                                                       mxDOUBLE_CLASS, mxREAL );
-    mxArray * density_mex      = mxCreateNumericArray( data->num_dimensions[12],
-                                                       data->dimensions+data->dimensions_offsets[12],
-                                                       mxDOUBLE_CLASS, mxREAL );
-    mxArray * volume_mex       = mxCreateNumericArray( data->num_dimensions[13],
-                                                       data->dimensions+data->dimensions_offsets[13],
-                                                       mxDOUBLE_CLASS, mxREAL );
-
-    mexMakeArrayPersistent(position_mex);
-    mexMakeArrayPersistent(posnext_mex);
-    mexMakeArrayPersistent(velocity_mex);
-    mexMakeArrayPersistent(veleval_mex);
-    mexMakeArrayPersistent(velnext_mex);
-    mexMakeArrayPersistent(acceleration_mex);
-    mexMakeArrayPersistent(force_mex);
-    mexMakeArrayPersistent(density_mex);
-    mexMakeArrayPersistent(volume_mex);
-
-    create_host_field_psdata(data, "position_mex",     position_mex,     sizeof(mxArray*));
-    create_host_field_psdata(data, "posnext_mex",      posnext_mex,      sizeof(mxArray*));
-    create_host_field_psdata(data, "velocity_mex",     velocity_mex,     sizeof(mxArray*));
-    create_host_field_psdata(data, "veleval_mex",      veleval_mex,      sizeof(mxArray*));
-    create_host_field_psdata(data, "velnext_mex",      velnext_mex,      sizeof(mxArray*));
-    create_host_field_psdata(data, "acceleration_mex", acceleration_mex, sizeof(mxArray*));
-    create_host_field_psdata(data, "force_mex",        force_mex,        sizeof(mxArray*));
-    create_host_field_psdata(data, "density_mex",      density_mex,      sizeof(mxArray*));
-    create_host_field_psdata(data, "volume_mex",       volume_mex,       sizeof(mxArray*));
-
-    sync_to_mex(data);
-#endif
-    }
-}
-
 int get_field_psdata(psdata data, const char * name) {
     unsigned int i;
     for (i = 0; i < data.num_fields; ++i) {
@@ -310,7 +93,7 @@ int get_field_psdata(psdata data, const char * name) {
 void set_field_psdata(psdata * data, const char * name, void * field, unsigned int size, unsigned int offset) {
     int i = get_field_psdata(*data, name);
 
-    if (i != -1) memcpy(data->data + data->data_offsets[i] + offset, field, size);
+    if (i != -1) memcpy((char*)data->data + data->data_offsets[i] + offset, field, size);
 }
 
 unsigned int psdata_names_size(psdata data) {
@@ -404,13 +187,6 @@ void sync_to_mex(psdata * data) {
         void * mex_field_ptr = mxGetData(mex_field);
         
         memcpy(mex_field_ptr, ((char*) data->data) + data->data_offsets[f], data->data_sizes[f]);
-        /* TODO: This is shit, fix it
-        int j;
-        for (j = 0; j < data->data_sizes[f]/sizeof(double); ++j) {
-            double val = ((double*) (data->data + data->data_offsets[f]))[j];
-            mex_field_ptr[j] = val;
-        }
-        */
     }
 }
 
@@ -456,6 +232,8 @@ void free_psdata( psdata * data ) {
     free(data->data_sizes);
     free(data->data_offsets);
 
+    free(data->data_ptrs);
+
     unsigned int i;
     for (i = 0; i < data->num_host_fields; ++i) {
 #ifdef MATLAB_MEX_FILE
@@ -467,7 +245,7 @@ void free_psdata( psdata * data ) {
 
         free(data->host_names[i]);
     }
-    note(2, "freed host data\n");
+    note(1, "freed host data\n");
 
     if (data->num_host_fields > 0) {
         free(data->host_names);

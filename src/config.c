@@ -16,7 +16,8 @@ static size_t g_num_sections = 0;
 static char * g_section_titles[MAX_SECTIONS] = {NULL};
 static char * g_section_starts[MAX_SECTIONS] = {NULL};
 
-void load_config(const char * relativePath) {
+int load_config(const char * relativePath) {
+    /* Let's stick to relative for now
 #ifndef MATLAB_MEX_FILE
     // Get the absolute path of the config
     int exe_path_len = wai_getExecutablePath(NULL, 0, NULL);
@@ -40,16 +41,17 @@ void load_config(const char * relativePath) {
 #ifndef MATLAB_MEX_FILE
     free(exe_path);
 #endif
+    */
 
     // Copy the contents
-    FILE * conf = fopen(conf_path, "rb");
+    FILE * conf = fopen(relativePath, "rb");
 
     if (conf == NULL) {
-        note(2, "Could not read file %s\n", conf_path);
-        ASSERT(0);
+        note(2, "Could not read file %s\n", relativePath);
+        return 1;
     }
 
-    free(conf_path);
+    // free(conf_path);
 
     fseek(conf, 0, SEEK_END);
     size_t conf_end = ftell(conf);
@@ -84,6 +86,8 @@ void load_config(const char * relativePath) {
 
         section_pointer = strtok(NULL, "\n");
     }
+
+    return 0;
 }
 const char * get_config_section(const char * heading) {
     for (size_t i = 0; i < g_num_sections; ++i) {

@@ -1,23 +1,23 @@
 kernel void compute_forces_fluids (PSO_ARGS) {
     USE_GRID_PROPS
 
-    USE_FIELD(density, double) USE_FIELD(force, double) USE_FIELD(position, double)
-    USE_FIELD(velocity, double)
+    USE_FIELD(density, float) USE_FIELD(force, float) USE_FIELD(position, float)
+    USE_FIELD(velocity, float)
 
-    USE_FIELD_FIRST_VALUE(n, uint) USE_FIELD_FIRST_VALUE(mass, double)
-    USE_FIELD_FIRST_VALUE(smoothingradius, double) USE_FIELD_FIRST_VALUE(pnum, uint)
-    USE_FIELD_FIRST_VALUE(restdens, double) USE_FIELD_FIRST_VALUE(stiffness, double)
-    USE_FIELD_FIRST_VALUE(viscosity, double)
+    USE_FIELD_FIRST_VALUE(n, uint) USE_FIELD_FIRST_VALUE(mass, float)
+    USE_FIELD_FIRST_VALUE(smoothingradius, float) USE_FIELD_FIRST_VALUE(pnum, uint)
+    USE_FIELD_FIRST_VALUE(restdens, float) USE_FIELD_FIRST_VALUE(stiffness, float)
+    USE_FIELD_FIRST_VALUE(viscosity, float)
     
     unsigned int i = get_global_id(0);
 
     if (i >= n) return;
 
-    double3 ipos = vload3(i, position);
-    double3 ivel = vload3(i, velocity);
+    float3 ipos = vload3(i, position);
+    float3 ivel = vload3(i, velocity);
 
 #define INIT_FLUIDS_FORCE_COMPUTATION \
-    double3 f_i = (double3)(0, 0, 0);
+    float3 f_i = (float3)(0, 0, 0);
 
     INIT_FLUIDS_FORCE_COMPUTATION
 
@@ -25,27 +25,27 @@ kernel void compute_forces_fluids (PSO_ARGS) {
         if (j == i) continue;
 
 #define FLUIDS_FORCE_COMPUTATION \
-        double p_i = (density[i] - restdens) * stiffness;\
-        double p_j = (density[j] - restdens) * stiffness;\
+        float p_i = (density[i] - restdens) * stiffness;\
+        float p_j = (density[j] - restdens) * stiffness;\
 \
-        double3 jpos = vload3(j, position);\
-        double3 jvel = vload3(j, velocity);\
+        float3 jpos = vload3(j, position);\
+        float3 jvel = vload3(j, velocity);\
 \
-        double3 diff = jpos - ipos;\
-        double3 relvel = jvel - ivel;\
+        float3 diff = jpos - ipos;\
+        float3 relvel = jvel - ivel;\
 \
-        double dist = length(diff);\
+        float dist = length(diff);\
 \
         if (dist > smoothingradius) continue;\
 \
-        double dist_in = smoothingradius - dist;\
+        float dist_in = smoothingradius - dist;\
 \
-        double didj = density[i] * density[j];\
+        float didj = density[i] * density[j];\
 \
-        double sr6 = pow(smoothingradius, 6);\
+        float sr6 = pow(smoothingradius, 6);\
 \
-        double vterm = viscosity * dist_in * 45 / PI / sr6;\
-        double pterm = (p_i + p_j) * 0.5 / dist * dist_in * dist_in * (-45 / PI / sr6);\
+        float vterm = viscosity * dist_in * 45 / PI / sr6;\
+        float pterm = (p_i + p_j) * 0.5 / dist * dist_in * dist_in * (-45 / PI / sr6);\
 \
         f_i += (diff * pterm + relvel * vterm) / didj;
 
