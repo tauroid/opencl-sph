@@ -103,7 +103,7 @@ void write_psdata(psdata data, int number, const char* Case)
             char filename[150];
             //strcpy(filename, "/media/aslab/data/hackthon_data/");
             //strcat(filename, Case);
-            strcpy(filename, "../../positions/position_");
+            strcpy(filename, "position_");
             strcat(filename, snum);
             strcat(filename, ".csv");
 
@@ -114,7 +114,7 @@ void write_psdata(psdata data, int number, const char* Case)
 
             for (unsigned int i = 0; i < d1; ++i) {
                 for (unsigned int j = 0; j < d0; ++j) {
-                    fprintf(f, "%0.3lf,", *((double*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
+                    fprintf(f, "%0.3lf,", *((REAL*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
                 }
                 fprintf(f,"\n");
 
