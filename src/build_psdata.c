@@ -519,6 +519,9 @@ static psdata_field_spec * sort_field_spec_list_by_type_size_descending(psdata_f
     return reordered;
 }
 
+// Constraints for
+//void setUpConstraints()
+
 void build_psdata_from_string(psdata * data, const char * string) {
     char * string_copy = malloc((strlen(string)+1) * sizeof(char));
     strcpy(string_copy, string);
@@ -552,6 +555,8 @@ void build_psdata_from_string(psdata * data, const char * string) {
 
     free_psdata_field_spec_list(reordered);
 }
+
+
 void build_psdata(psdata * data, const char * path) {
     FILE * conf = fopen(path, "rb");
 

@@ -33,15 +33,15 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[]) {
     mxFree(config_path);
 
     
-    //create_stored_psdata_from_string(get_config_section("psdata_specification"));
+    create_stored_psdata_from_string(get_config_section("psdata_specification"));
 
-    //data = get_stored_psdata();
+    data = get_stored_psdata();
 
     init_opencl();
 
-    //psdata_opencl pso = create_psdata_opencl(data, get_config_section("opencl_kernel_files"));
+    psdata_opencl pso = create_psdata_opencl(data, get_config_section("opencl_kernel_files"));
 
-    //opencl_use_buflist(pso);
+    opencl_use_buflist(pso);
 
     unload_config();
 

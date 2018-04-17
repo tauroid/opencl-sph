@@ -52,7 +52,7 @@ void free_stored_psdata();
 #endif
 
 void display_psdata(psdata, const char * const * mask);
-void write_psdata(psdata, const char * const * mask);
+void write_psdata(psdata, int number, const char * Case);
 
 void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, double smoothingradius,
        double xbound1, double ybound1, double zbound1, double xbound2, double ybound2, double zbound2 );

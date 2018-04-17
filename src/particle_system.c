@@ -84,74 +84,45 @@ void display_psdata(psdata data, const char * const * mask) {
     }
 }
 
-void write_psdata(psdata data, const char * const * mask) {
-    if (mask == NULL) {
-        for (size_t field = 0; field < data.num_fields; ++field)
+void write_psdata(psdata data, int number, const char* Case)
+{
+
+    for (size_t field = 0; field < data.num_fields; ++field)
+    {
+
+        char * name = data.names + data.names_offsets[field];
+
+
+        char snum[5];
+        sprintf(snum, "%d", number);
+
+
+        if (strcmp(name, "position") == 0)
         {
-            //note(2, "%s:\n\n", data.names + data.names_offsets[field]);
 
-            char * name = data.names + data.names_offsets[field];
+            char filename[150];
+            strcpy(filename, "/media/aslab/data/hackthon_data/");
+            strcat(filename, Case);
+            strcat(filename, "/positions/position_");
+            strcat(filename, snum);
+            strcat(filename, ".csv");
 
-            if (strcmp(name, "originalpos") == 0)
-            {
+            FILE *f = fopen(filename, "w");
 
-                FILE *f = fopen("originalpos.csv", "w");
+            unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
+            unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
 
-                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
-                unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
-
-                for (unsigned int i = 0; i < d1; ++i) {
-                    for (unsigned int j = 0; j < d0; ++j) {
-                        //fprintf (f, "%g,",i + 1);
-                        fprintf(f, "%0.3lf,", *((double*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
-                    }
-                    fprintf(f,"\n");
-
+            for (unsigned int i = 0; i < d1; ++i) {
+                for (unsigned int j = 0; j < d0; ++j) {
+                    fprintf(f, "%0.3lf,", *((double*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
                 }
-                fclose(f);
+                fprintf(f,"\n");
+
             }
-
-            if (strcmp(name, "position") == 0)
-            {
-
-                FILE *f = fopen("position.csv", "w");
-
-                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
-                unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
-
-                for (unsigned int i = 0; i < d1; ++i) {
-                    for (unsigned int j = 0; j < d0; ++j) {
-                        //fprintf (f, "%g,",i + 1);
-                        fprintf(f, "%0.3lf,", *((double*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
-                    }
-                    fprintf(f,"\n");
-
-                }
-                fclose(f);
-            }
-
-            if (strcmp(name, "posnext") == 0)
-            {
-
-                FILE *f = fopen("posnext.csv", "w");
-
-                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
-                unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
-
-                for (unsigned int i = 0; i < d1; ++i) {
-                    for (unsigned int j = 0; j < d0; ++j) {
-                        //fprintf (f, "%g,",i + 1);
-                        fprintf(f, "%0.3lf,", *((double*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
-                    }
-                    fprintf(f,"\n");
-
-                }
-                fclose(f);
-            }
-
-
+            fclose(f);
         }
     }
+
 }
 
 void init_psdata_fluid( psdata * data, int pnum, double mass, double timestep, double smoothingradius,
