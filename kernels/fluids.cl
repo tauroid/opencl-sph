@@ -2,10 +2,18 @@
 #define OPENCL_SPH_REAL_TYPE float
 #endif
 
-typedef float REAL;
+typedef OPENCL_SPH_REAL_TYPE REAL;
+#if OPENCL_SPH_REAL_TYPE == float
 typedef float2 REAL2;
 typedef float3 REAL3;
 typedef float4 REAL4;
+#elif OPENCL_SPH_REAL_TYPE == double
+typedef double2 REAL2;
+typedef double3 REAL3;
+typedef double4 REAL4;
+#else
+#error "OPENCL_SPH_REAL_TYPE must be either float or double."
+#endif
 
 kernel void compute_forces_fluids (PSO_ARGS) {
     USE_GRID_PROPS
