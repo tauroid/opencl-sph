@@ -37,7 +37,10 @@ make targets
   make
   make install 
   ```
-
+Reserve resources of GPU
+```shell
+srun -A gpuhack02 -N 1 -p gpuq --reservation=gpu-hackathon --gres=gpu:2 --pty /bin/bash
+```
 Run executable
   ```shell
   ./install/bin/opencl_sph
