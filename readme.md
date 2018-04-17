@@ -84,3 +84,27 @@ The current interface is through MATLAB - see [go.m](go.m) or [go_fluid.m](go_fl
 These implement an elastic solid based on [Becker et al. 2009](http://cg.informatik.uni-freiburg.de/publications/2009_NP_corotatedSPH.pdf) and a simple pressure gradient fluid respectively.
 
 Using particle configurations other than a cube at the moment requires manual specification in the `position` field of psdata.
+
+Profiling information
+==========
+
+On Athena
+
+1. checkout Athena branch
+1. ```sh cd ${HOME}```
+1. ```sh module load intel intel-opencl-sdk broadwell forge```
+1. ```sh make-profiler-libraries```
+1. ```srun -A gpuhack02 -N 1 -p gpuq --reservation=gpu-hackathon --gres=gpu:2 --pty /bin/bash```
+1. cd to your opencl-sph directory
+1. ```sh mkdir -p mybuild install```
+1. ```sh cd mybuild```
+1. ```sh ../profiling/build_for_map.sh```
+1. ```sh make```
+1. ```sh make install```
+1. ```sh cd ../profiling```
+1. edit profile_code.sh to point to your mybuild/install/bin/opencl-sph location
+1. ```sh ./profile_code.sh```
+1. copy the .map file to your laptop
+1. download map from https://developer.arm.com/products/software-development-tools/hpc/downloads/download-arm-forge to your laptop
+1. open local map file and enjoy
+
