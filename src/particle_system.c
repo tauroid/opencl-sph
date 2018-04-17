@@ -1,14 +1,19 @@
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
+
 #ifndef MATLAB_MEX_FILE
     #include <stdlib.h>
 #else
     #include "mex.h"
 #endif
+
+
 #include "note.h"
 #include "particle_system.h"
 #include "build_psdata.h"
 #include "opencl/particle_system_host.h"
+
 
 static psdata * ps_instance = NULL;
 
@@ -75,6 +80,76 @@ void display_psdata(psdata data, const char * const * mask) {
                 }
             }
             note(2, "\n\n");
+        }
+    }
+}
+
+void write_psdata(psdata data, const char * const * mask) {
+    if (mask == NULL) {
+        for (size_t field = 0; field < data.num_fields; ++field)
+        {
+            //note(2, "%s:\n\n", data.names + data.names_offsets[field]);
+
+            char * name = data.names + data.names_offsets[field];
+
+            if (strcmp(name, "originalpos") == 0)
+            {
+
+                FILE *f = fopen("originalpos.csv", "w");
+
+                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
+                unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
+
+                for (unsigned int i = 0; i < d1; ++i) {
+                    for (unsigned int j = 0; j < d0; ++j) {
+                        //fprintf (f, "%g,",i + 1);
+                        fprintf(f, "%0.3lf,", *((double*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
+                    }
+                    fprintf(f,"\n");
+
+                }
+                fclose(f);
+            }
+
+            if (strcmp(name, "position") == 0)
+            {
+
+                FILE *f = fopen("position.csv", "w");
+
+                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
+                unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
+
+                for (unsigned int i = 0; i < d1; ++i) {
+                    for (unsigned int j = 0; j < d0; ++j) {
+                        //fprintf (f, "%g,",i + 1);
+                        fprintf(f, "%0.3lf,", *((double*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
+                    }
+                    fprintf(f,"\n");
+
+                }
+                fclose(f);
+            }
+
+            if (strcmp(name, "posnext") == 0)
+            {
+
+                FILE *f = fopen("posnext.csv", "w");
+
+                unsigned int d0 = (data.dimensions + data.dimensions_offsets[field])[0];
+                unsigned int d1 = (data.dimensions + data.dimensions_offsets[field])[1];
+
+                for (unsigned int i = 0; i < d1; ++i) {
+                    for (unsigned int j = 0; j < d0; ++j) {
+                        //fprintf (f, "%g,",i + 1);
+                        fprintf(f, "%0.3lf,", *((double*)((char*)data.data + data.data_offsets[field] + (i*d0+j)*data.entry_sizes[field])));
+                    }
+                    fprintf(f,"\n");
+
+                }
+                fclose(f);
+            }
+
+
         }
     }
 }

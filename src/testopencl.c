@@ -51,6 +51,7 @@ int main(int argc, char *argv[])
             call_for_all_particles_device_opencl(pso, "compute_rotations_and_strains");
 
             call_for_all_particles_device_opencl(pso, "compute_stresses");
+
             call_for_all_particles_device_opencl(pso, "compute_forces_solids");
 
             call_for_all_particles_device_opencl(pso, "step_forward");
@@ -60,6 +61,8 @@ int main(int argc, char *argv[])
     terminate_opencl();
 
     unload_config();
+
+    write_psdata(data, NULL);
 
     display_psdata(data, NULL);
 

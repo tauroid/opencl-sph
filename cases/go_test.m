@@ -1,5 +1,5 @@
 clear all;
-
+addpath('../bin/mex/');  
 init_wrap('/../../conf/solidstretch.conf');
 
 % Set some initial conditions

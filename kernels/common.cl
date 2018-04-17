@@ -622,7 +622,7 @@ kernel void step_forward (PSO_ARGS) {
 
     double3 pnext = p + timestep * vnext;
 
-    vstore3(pnext, i, position);
+    vstore3(pnext, i, posnext);
     vstore3(vnext, i, velocity);
 }
 
