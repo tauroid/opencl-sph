@@ -94,7 +94,9 @@ On Athena
 1. ```sh cd ${HOME}```
 1. ```sh module load intel intel-opencl-sdk broadwell forge```
 1. ```sh make-profiler-libraries```
-1. ```srun -A gpuhack02 -N 1 -p gpuq --reservation=gpu-hackathon --gres=gpu:2 --pty /bin/bash```
+  1. ```srun -A gpuhack02 -N 1 -p gpuq --reservation=gpu-hackathon --gres=gpu:2 --pty /bin/bash```
+  * or
+  1. ```srun -A gpuhack02 -N 1 -p knlq --reservation=gpu-hackathon --pty /bin/bash```
 1. cd to your opencl-sph directory
 1. ```sh mkdir -p mybuild install```
 1. ```sh cd mybuild```
