@@ -29,7 +29,7 @@ static Platform const * _platforms;
 static unsigned int _num_platforms;
 
 // static targets to be replaced in later versions.
-static int target_platform = 1; // for Bracewell
+static int target_platform = 0;//0 for Intel(R) Gen9 HD Graphics NEO on CSIRO laptop  //1 for Bracewell
 
 static int target_device = 0; // 0,1,2,3 for Bracewell
 
